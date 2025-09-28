@@ -137,25 +137,63 @@ class _PostRideState extends State<PostRide> {
       return;
     }
     setState(() => loading = true);
-    await FirebaseFirestore.instance.collection("rides").add({
-      "from": fromC.text,
-      "to": toC.text,
-      "fare": fareC.text,
-      "date": dateC.text,
-      "time": timeC.text,
-      "fromLat": _fromLatLng!.latitude,
-      "fromLng": _fromLatLng!.longitude,
-      "toLat": _toLatLng!.latitude,
-      "toLng": _toLatLng!.longitude,
-      "costPerKm": costPerKm,
-      "driverAadhaar": aadhaarFileName,
-      "driverPhoto": driverPhotoName,
-      "vehicleRegNo": vehicleRegC.text,
-      "driverContact": driverContactC.text,
-      "createdAt": FieldValue.serverTimestamp(),
-    });
-    setState(() => loading = false);
-    if (mounted) Navigator.pop(context);
+    
+    try {
+      await FirebaseFirestore.instance.collection("rides").add({
+        "from": fromC.text,
+        "to": toC.text,
+        "fare": fareC.text,
+        "date": dateC.text,
+        "time": timeC.text,
+        "fromLat": _fromLatLng!.latitude,
+        "fromLng": _fromLatLng!.longitude,
+        "toLat": _toLatLng!.latitude,
+        "toLng": _toLatLng!.longitude,
+        "costPerKm": costPerKm,
+        "driverAadhaar": aadhaarFileName,
+        "driverPhoto": driverPhotoName,
+        "vehicleRegNo": vehicleRegC.text,
+        "driverContact": driverContactC.text,
+        "createdAt": FieldValue.serverTimestamp(),
+      });
+      
+      setState(() => loading = false);
+      
+      // Show success popup
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green, size: 32),
+                SizedBox(width: 8),
+                Text('Success!'),
+              ],
+            ),
+            content: Text('Your ride has been posted successfully!'),
+            actions: [
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close dialog
+                  Navigator.of(context).pop(); // Go back to previous screen
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                child: Text('OK', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => loading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error posting ride: $e')),
+        );
+      }
+    }
   }
 
   void _onMapTap(LatLng pos) {
@@ -163,9 +201,25 @@ class _PostRideState extends State<PostRide> {
       if (selectingPickup) {
         _fromLatLng = pos;
         fromC.text = '(${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)})';
+        // Show success feedback
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Pickup location set at ${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
       } else {
         _toLatLng = pos;
         toC.text = '(${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)})';
+        // Show success feedback
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Drop location set at ${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 2),
+          ),
+        );
       }
       _updateFare();
     });
@@ -225,48 +279,87 @@ class _PostRideState extends State<PostRide> {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              SizedBox(
-                height: MediaQuery.of(context).size.height * 0.4,
-                child: GoogleMap(
-                  initialCameraPosition: const CameraPosition(
-                    target: LatLng(21.0, 75.0), zoom: 7,
+              Container(
+                height: MediaQuery.of(context).size.height * 0.5,
+                decoration: BoxDecoration(
+                  border: Border.all(color: selectingPickup ? Colors.green : Colors.red, width: 2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: GoogleMap(
+                    initialCameraPosition: const CameraPosition(
+                      target: LatLng(21.0, 75.0), zoom: 7,
+                    ),
+                    onMapCreated: (c) => _mapController = c,
+                    markers: {
+                      if (_fromLatLng != null)
+                        Marker(
+                          markerId: const MarkerId('from'), 
+                          position: _fromLatLng!, 
+                          infoWindow: const InfoWindow(title: 'Pickup'),
+                          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                        ),
+                      if (_toLatLng != null)
+                        Marker(
+                          markerId: const MarkerId('to'), 
+                          position: _toLatLng!, 
+                          infoWindow: const InfoWindow(title: 'Drop'),
+                          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                        ),
+                    },
+                    onTap: _onMapTap,
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: true,
                   ),
-                  onMapCreated: (c) => _mapController = c,
-                  markers: {
-                    if (_fromLatLng != null)
-                      Marker(markerId: const MarkerId('from'), position: _fromLatLng!, infoWindow: const InfoWindow(title: 'Pickup')),
-                    if (_toLatLng != null)
-                      Marker(markerId: const MarkerId('to'), position: _toLatLng!, infoWindow: const InfoWindow(title: 'Drop')),
-                  },
-                  onTap: _onMapTap,
-                  myLocationEnabled: true,
-                  myLocationButtonEnabled: true,
-                  zoomGesturesEnabled: true,
-                  scrollGesturesEnabled: true,
-                  tiltGesturesEnabled: true,
-                  rotateGesturesEnabled: true,
-                  mapToolbarEnabled: true,
                 ),
               ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: selectingPickup ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: selectingPickup ? Colors.green : Colors.red,
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  selectingPickup 
+                    ? '🟢 Tap on map to select PICKUP location' 
+                    : '🔴 Tap on map to select DROP location',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: selectingPickup ? Colors.green.shade700 : Colors.red.shade700,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  ElevatedButton(
+                  ElevatedButton.icon(
                     onPressed: () => setState(() => selectingPickup = true),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: selectingPickup ? Colors.indigo : Colors.grey,
+                      backgroundColor: selectingPickup ? Colors.green : Colors.grey,
                       foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
-                    child: Text('Select Pickup', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    icon: Icon(selectingPickup ? Icons.radio_button_checked : Icons.radio_button_unchecked),
+                    label: Text('Select Pickup', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                   const SizedBox(width: 10),
-                  ElevatedButton(
+                  ElevatedButton.icon(
                     onPressed: () => setState(() => selectingPickup = false),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: !selectingPickup ? Colors.indigo : Colors.grey,
+                      backgroundColor: !selectingPickup ? Colors.red : Colors.grey,
                       foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
-                    child: Text('Select Drop', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    icon: Icon(!selectingPickup ? Icons.radio_button_checked : Icons.radio_button_unchecked),
+                    label: Text('Select Drop', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),

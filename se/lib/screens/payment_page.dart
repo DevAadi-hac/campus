@@ -51,27 +51,70 @@ class _PaymentPageState extends State<PaymentPage> {
 
   void _handleSuccess(PaymentSuccessResponse response) async {
     final user = FirebaseAuth.instance.currentUser!;
-    // Add all relevant ride info to booking for display in MyBookings
-    await FirebaseFirestore.instance.collection('bookings').add({
-      'rideId': widget.ride['id'],
-      'riderId': user.uid,
-      'driverId': widget.ride['driverId'],
-      'fare': widget.ride['fare'],
-      'status': 'confirmed',
-      'paymentId': response.paymentId,
-      'createdAt': FieldValue.serverTimestamp(),
-      'from': widget.ride['from'],
-      'to': widget.ride['to'],
-      'date': widget.ride['date'],
-      'time': widget.ride['time'],
-      'costPerKm': widget.ride['costPerKm'],
-      'vehicleRegNo': widget.ride['vehicleRegNo'],
-      'driverContact': widget.ride['driverContact'],
-      'vehiclePhoto': widget.ride['vehiclePhoto'],
-    });
+    
+    try {
+      // Add all relevant ride info to booking for display in MyBookings
+      await FirebaseFirestore.instance.collection('bookings').add({
+        'rideId': widget.ride['id'],
+        'riderId': user.uid,
+        'driverId': widget.ride['driverId'],
+        'fare': widget.ride['fare'],
+        'status': 'confirmed',
+        'paymentId': response.paymentId,
+        'createdAt': FieldValue.serverTimestamp(),
+        'from': widget.ride['from'],
+        'to': widget.ride['to'],
+        'date': widget.ride['date'],
+        'time': widget.ride['time'],
+        'costPerKm': widget.ride['costPerKm'],
+        'vehicleRegNo': widget.ride['vehicleRegNo'],
+        'driverContact': widget.ride['driverContact'],
+        'vehiclePhoto': widget.ride['vehiclePhoto'],
+      });
 
-    if (mounted) {
-      Navigator.pushNamedAndRemoveUntil(context, '/myBookings', (route) => false);
+      if (mounted) {
+        // Show success popup
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green, size: 32),
+                SizedBox(width: 8),
+                Text('Booking Confirmed!'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Payment successful!'),
+                SizedBox(height: 8),
+                Text('Your ride has been booked successfully.'),
+                SizedBox(height: 8),
+                Text('Payment ID: ${response.paymentId}'),
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close dialog
+                  Navigator.pushNamedAndRemoveUntil(context, '/myBookings', (route) => false);
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                child: Text('View Bookings', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving booking: $e')),
+        );
+        Navigator.pop(context);
+      }
     }
   }
 

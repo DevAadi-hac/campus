@@ -11,7 +11,145 @@ class MyBookings extends StatefulWidget {
 }
 
 class _MyBookingsState extends State<MyBookings> {
+  String? _cancelFeedback;
 
+  Future<void> _cancelBooking(String bookingId, Map<String, dynamic> booking) async {
+    // Show confirmation dialog
+    final bool? confirmCancel = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.warning, color: Colors.orange, size: 28),
+            SizedBox(width: 8),
+            Text('Cancel Booking'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Are you sure you want to cancel this booking?'),
+            SizedBox(height: 8),
+            Text('Your ride will be cancelled and money will be refunded soon.', 
+                 style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('Keep Booking'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: Text('Cancel Booking', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmCancel == true) {
+      // Show sad emoji feedback dialog
+      await _showCancelFeedbackDialog(bookingId, booking);
+    }
+  }
+
+  Future<void> _showCancelFeedbackDialog(String bookingId, Map<String, dynamic> booking) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('😢', style: TextStyle(fontSize: 28)),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Why are you canceling?',
+                  style: TextStyle(fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: MediaQuery.of(context).size.width * 0.8,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'We\'re sorry to see you go! Please let us know why you\'re canceling:',
+                  style: TextStyle(fontSize: 14),
+                ),
+                SizedBox(height: 16),
+                TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Tell us why you\'re canceling...',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.all(12),
+                  ),
+                  maxLines: 3,
+                  maxLength: 200,
+                  onChanged: (value) {
+                    setDialogState(() {
+                      _cancelFeedback = value;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _processCancellation(bookingId, booking);
+              },
+              child: Text('Skip'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _processCancellation(bookingId, booking);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+              child: Text('Submit', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _processCancellation(String bookingId, Map<String, dynamic> booking) async {
+    try {
+      // Update booking status to cancelled
+      await FirebaseFirestore.instance.collection('bookings').doc(bookingId).update({
+        'status': 'cancelled',
+        'cancelledAt': FieldValue.serverTimestamp(),
+        'cancelFeedback': _cancelFeedback ?? 'No feedback provided',
+      });
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Booking cancelled successfully! Refund will be processed soon.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error cancelling booking: $e')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +169,10 @@ class _MyBookingsState extends State<MyBookings> {
             itemCount: docs.length,
             itemBuilder: (c, i) {
               final booking = docs[i].data();
+              final bookingId = docs[i].id;
+              final isConfirmed = booking['status'] == 'confirmed';
+              final isCancelled = booking['status'] == 'cancelled';
+              
               return Card(
                 margin: const EdgeInsets.all(12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -46,20 +188,20 @@ class _MyBookingsState extends State<MyBookings> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              'Ride: ${booking['rideId'] ?? ''}',
+                              '${booking['from'] ?? ''} → ${booking['to'] ?? ''}',
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                             ),
                           ),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              color: booking['status'] == 'confirmed' ? Colors.green[100] : Colors.orange[100],
+                              color: isConfirmed ? Colors.green[100] : isCancelled ? Colors.red[100] : Colors.orange[100],
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
                               booking['status']?.toUpperCase() ?? '',
                               style: TextStyle(
-                                color: booking['status'] == 'confirmed' ? Colors.green[800] : Colors.orange[800],
+                                color: isConfirmed ? Colors.green[800] : isCancelled ? Colors.red[800] : Colors.orange[800],
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -89,6 +231,48 @@ class _MyBookingsState extends State<MyBookings> {
                             ),
                           ),
                         ),
+                      // Cancel button for confirmed bookings
+                      if (isConfirmed) ...[
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: () => _cancelBooking(bookingId, booking),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                              ),
+                              icon: Icon(Icons.cancel, size: 18),
+                              label: Text('Cancel Booking'),
+                            ),
+                          ],
+                        ),
+                      ],
+                      // Show cancellation info for cancelled bookings
+                      if (isCancelled) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.red[50],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.red[200]!),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info, color: Colors.red[600], size: 20),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Booking cancelled. Refund will be processed soon.',
+                                  style: TextStyle(color: Colors.red[800], fontSize: 12),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
