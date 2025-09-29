@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'feedback_page.dart';
+import '../services/notification_service.dart';
 
 class PaymentPage extends StatefulWidget {
   final Map<String, dynamic> ride;
@@ -71,6 +71,20 @@ class _PaymentPageState extends State<PaymentPage> {
         'driverContact': widget.ride['driverContact'],
         'vehiclePhoto': widget.ride['vehiclePhoto'],
       });
+
+      // Send booking notification
+      NotificationService.sendRideNotification(
+        userId: user.uid,
+        type: 'ride_booked',
+        rideData: {
+          'from': widget.ride['from'],
+          'to': widget.ride['to'],
+          'fare': widget.ride['fare'],
+          'date': widget.ride['date'],
+          'time': widget.ride['time'],
+          'paymentId': response.paymentId,
+        },
+      );
 
       if (mounted) {
         // Show success popup

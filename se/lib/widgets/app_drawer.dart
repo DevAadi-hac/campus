@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
+import '../providers/theme_provider.dart';
 import '../screens/driver_home.dart';
 import '../screens/rider_home.dart';
 import '../screens/my_rides.dart';
 import '../screens/my_bookings.dart';
+import '../screens/admin_dashboard.dart';
 import '../screens/login_phone.dart';
 
 class AppDrawer extends StatelessWidget {
@@ -13,6 +15,7 @@ class AppDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthService>(context, listen: false);
+    final themeProvider = Provider.of<ThemeProvider>(context);
 
     return Drawer(
       child: ListView(
@@ -44,7 +47,18 @@ class AppDrawer extends StatelessWidget {
             onTap: () => Navigator.pushReplacement(
               context, MaterialPageRoute(builder: (_) => const MyBookings())),
           ),
+          ListTile(
+            leading: const Icon(Icons.analytics),
+            title: const Text("Admin Dashboard"),
+            onTap: () => Navigator.pushReplacement(
+              context, MaterialPageRoute(builder: (_) => const AdminDashboard())),
+          ),
           const Divider(),
+          ListTile(
+            leading: Icon(themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode),
+            title: Text(themeProvider.isDarkMode ? "Light Mode" : "Dark Mode"),
+            onTap: () => themeProvider.toggleTheme(),
+          ),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),
             title: const Text("Logout"),
