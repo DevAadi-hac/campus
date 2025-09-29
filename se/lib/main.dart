@@ -13,6 +13,8 @@ import 'screens/driver_home.dart';
 import 'screens/rider_home.dart';
 import 'screens/my_bookings.dart';
 
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -26,13 +28,14 @@ Future<void> main() async {
     debugPrint('Firebase.initializeApp() error: $e\n$st');
   }
   
-  // Initialize notifications (stable implementation)
-  Future.delayed(Duration(seconds: 1), () {
-    NotificationService.initialize().catchError((e) {
-      debugPrint('Notification initialization error: $e');
-      // Continue app initialization even if notifications fail
-    });
-  });
+  // Initialize notifications
+  try {
+    await NotificationService.initialize();
+    NotificationService.setNavigatorKey(navigatorKey);
+  } catch (e, st) {
+    debugPrint('Notification initialization error: $e\n$st');
+    // Continue app initialization even if notifications fail
+  }
 
   runApp(
     MultiProvider(
@@ -54,6 +57,7 @@ class MyApp extends StatelessWidget {
     final themeProvider = Provider.of<ThemeProvider>(context);
 
     return MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'Campus Ride',
       theme: themeProvider.lightTheme,

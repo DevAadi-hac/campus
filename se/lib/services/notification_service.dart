@@ -7,6 +7,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 class NotificationService {
   static final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   static final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  static GlobalKey<NavigatorState>? navigatorKey;
+
+  static void setNavigatorKey(GlobalKey<NavigatorState> key) {
+    navigatorKey = key;
+  }
 
   static Future<void> initialize() async {
     try {

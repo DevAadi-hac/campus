@@ -96,17 +96,24 @@ class _PaymentPageState extends State<PaymentPage> {
               children: [
                 Icon(Icons.check_circle, color: Colors.green, size: 32),
                 SizedBox(width: 8),
-                Text('Booking Confirmed!'),
+                Flexible(child: Text('Booking Confirmed!')),
               ],
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Payment successful!'),
                 SizedBox(height: 8),
                 Text('Your ride has been booked successfully.'),
                 SizedBox(height: 8),
-                Text('Payment ID: ${response.paymentId}'),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Payment ID: '),
+                    Flexible(child: Text(response.paymentId ?? 'N/A')),
+                  ],
+                ),
               ],
             ),
             actions: [
