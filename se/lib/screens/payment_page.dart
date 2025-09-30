@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
 import '../services/notification_service.dart';
+import 'ride_simulation_screen.dart';
 
 class PaymentPage extends StatefulWidget {
   final Map<String, dynamic> ride;
@@ -51,12 +54,16 @@ class _PaymentPageState extends State<PaymentPage> {
 
   void _handleSuccess(PaymentSuccessResponse response) async {
     final user = FirebaseAuth.instance.currentUser!;
+    final auth = Provider.of<AuthService>(context, listen: false);
+    final profile = auth.profile;
     
     try {
       // Add all relevant ride info to booking for display in MyBookings
-      await FirebaseFirestore.instance.collection('bookings').add({
+      final newBooking = await FirebaseFirestore.instance.collection('bookings').add({
         'rideId': widget.ride['id'],
-        'riderId': user.uid,
+        'userId': user.uid,
+        'riderName': profile?['displayName'] ?? 'N/A',
+        'riderContact': user.phoneNumber ?? 'N/A',
         'driverId': widget.ride['driverId'],
         'fare': widget.ride['fare'],
         'status': 'confirmed',
@@ -87,45 +94,27 @@ class _PaymentPageState extends State<PaymentPage> {
       );
 
       if (mounted) {
-        // Show success popup
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            title: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.green, size: 32),
-                SizedBox(width: 8),
-                Flexible(child: Text('Booking Confirmed!')),
-              ],
+        final from = widget.ride['from'] as String?;
+        final to = widget.ride['to'] as String?;
+        final driverId = widget.ride['driverId'] as String?;
+
+        if (from == null || to == null || driverId == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error: Ride data is incomplete. Cannot start simulation.')),
+          );
+          Navigator.pop(context);
+          return;
+        }
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => RideSimulationScreen(
+              from: from,
+              to: to,
+              rideId: widget.ride['id'],
+              driverId: driverId,
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Payment successful!'),
-                SizedBox(height: 8),
-                Text('Your ride has been booked successfully.'),
-                SizedBox(height: 8),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Payment ID: '),
-                    Flexible(child: Text(response.paymentId ?? 'N/A')),
-                  ],
-                ),
-              ],
-            ),
-            actions: [
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop(); // Close dialog
-                  Navigator.pushNamedAndRemoveUntil(context, '/myBookings', (route) => false);
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                child: Text('View Bookings', style: TextStyle(color: Colors.white)),
-              ),
-            ],
           ),
         );
       }

@@ -263,6 +263,17 @@ class _RiderHomeState extends State<RiderHome> {
                                           ),
                                           ElevatedButton(
                                             onPressed: () {
+                                              final from = ride['from'] as String?;
+                                              final to = ride['to'] as String?;
+                                              final driverId = ride['driverId'] as String?;
+
+                                              if (from == null || to == null || driverId == null) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(content: Text('This ride has incomplete data and cannot be booked.')),
+                                                );
+                                                return;
+                                              }
+
                                               // Navigate to PaymentPage, pass ride info (including rideId)
                                               final rideWithId = Map<String, dynamic>.from(ride);
                                               rideWithId['id'] = rideId;

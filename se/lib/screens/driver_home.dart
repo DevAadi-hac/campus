@@ -8,6 +8,7 @@ import 'post_ride.dart';
 import 'my_rides.dart';
 import 'rider_home.dart';
 import 'my_bookings.dart';
+import 'driver_bookings.dart'; // Import new screen
 
 class DriverHome extends StatefulWidget {
   const DriverHome({super.key});
@@ -97,29 +98,27 @@ class _DriverHomeState extends State<DriverHome> {
                     style: const TextStyle(color: Colors.white70, fontSize: 14),
                   ),
                   const SizedBox(height: 10),
-                  StreamBuilder(
+                  StreamBuilder<DocumentSnapshot>(
                     stream: FirebaseFirestore.instance
                         .collection('drivers')
                         .doc(auth.user!.uid)
-                        .collection('ratings')
                         .snapshots(),
                     builder: (context, snapshot) {
-                      if (!snapshot.hasData) {
-                        return const Text("Rating: --",
+                      if (!snapshot.hasData || !snapshot.data!.exists) {
+                        return const Text("Rating: Not available",
                             style: TextStyle(color: Colors.white));
                       }
-                      final docs = snapshot.data!.docs;
-                      if (docs.isEmpty) {
+                      final data = snapshot.data!.data() as Map<String, dynamic>?;
+                      final averageRating = data?['averageRating'] as double? ?? 0.0;
+                      final ratingCount = data?['ratingCount'] as int? ?? 0;
+
+                      if (ratingCount == 0) {
                         return const Text("Rating: No ratings yet",
                             style: TextStyle(color: Colors.white));
                       }
-                      final ratings = docs
-                          .map((d) => (d['rating'] as num).toDouble())
-                          .toList();
-                      final avg =
-                          ratings.reduce((a, b) => a + b) / ratings.length;
+
                       return Text(
-                        "⭐ ${avg.toStringAsFixed(1)} / 5.0",
+                        "⭐ ${averageRating.toStringAsFixed(1)} / 5.0 ($ratingCount ratings)",
                         style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -146,6 +145,14 @@ class _DriverHomeState extends State<DriverHome> {
               onTap: () {
                 Navigator.push(context,
                     MaterialPageRoute(builder: (_) => const MyRides()));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.people),
+              title: const Text("Booked Rides"),
+              onTap: () {
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const DriverBookings()));
               },
             ),
             ListTile(

@@ -130,6 +130,10 @@ class _PostRideState extends State<PostRide> {
     setState(() => loading = true);
 
     try {
+      final user = FirebaseAuth.instance.currentUser!;
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final driverName = userDoc.data()?['name'] ?? 'Anonymous Driver';
+
       await FirebaseFirestore.instance.collection("rides").add({
         "from": fromC.text,
         "to": toC.text,
@@ -146,6 +150,8 @@ class _PostRideState extends State<PostRide> {
         "vehicleRegNo": vehicleRegC.text,
         "driverContact": driverContactC.text,
         "createdAt": FieldValue.serverTimestamp(),
+        "driverId": user.uid,
+        "driverName": driverName,
       });
 
       setState(() => loading = false);

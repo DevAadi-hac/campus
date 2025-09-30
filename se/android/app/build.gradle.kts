@@ -18,8 +18,11 @@ android {
     }
 
     buildTypes {
-        release {
-            signingConfig = signingConfigs.getByName("debug")
+        getByName("release") {
+            // 🔧 FIX: Kotlin DSL syntax
+            // signingConfig = signingConfigs.getByName("release")  // uncomment if you have a release keystore
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 
