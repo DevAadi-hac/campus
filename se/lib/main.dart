@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 
 import 'firebase_options.dart';
 
@@ -23,6 +24,14 @@ Future<void> main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    await FirebaseAppCheck.instance.activate(
+      webProvider: ReCaptchaV3Provider('your-recaptcha-v3-site-key'),
+      androidProvider: AndroidProvider.debug,
+      appleProvider: AppleProvider.debug,
+    );
+    FirebaseAppCheck.instance.onTokenChange.listen((token) {
+      print('App Check token: $token');
+    });
   } catch (e, st) {
     // Initialization might already be done elsewhere or options missing — log and continue.
     debugPrint('Firebase.initializeApp() error: $e\n$st');

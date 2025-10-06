@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -28,7 +29,10 @@ class _PostRideState extends State<PostRide> {
   final costPerKmC = TextEditingController();
   final vehicleRegC = TextEditingController();
   final driverContactC = TextEditingController();
+  final vehicleNameC = TextEditingController();
+  final seatsC = TextEditingController();
 
+  String? vehicleType;
   bool loading = false;
   LatLng? _fromLatLng;
   LatLng? _toLatLng;
@@ -36,13 +40,9 @@ class _PostRideState extends State<PostRide> {
 
   String? costPerKmError;
   String? driverContactError;
-  String? aadhaarFileName;
-  String? driverPhotoName;
-  String? vehiclePhotoName;
 
-  dynamic aadhaarFile;
-  dynamic driverPhoto;
-  dynamic vehiclePhoto;
+  File? driverPhoto;
+  File? vehiclePhoto;
 
   @override
   void initState() {
@@ -89,15 +89,10 @@ class _PostRideState extends State<PostRide> {
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
       setState(() {
-        if (type == 'aadhaar') {
-          aadhaarFileName = image.name;
-          aadhaarFile = image.path;
-        } else if (type == 'driverPhoto') {
-          driverPhotoName = image.name;
-          driverPhoto = image.path;
+        if (type == 'driverPhoto') {
+          driverPhoto = File(image.path);
         } else if (type == 'vehiclePhoto') {
-          vehiclePhotoName = image.name;
-          vehiclePhoto = image.path;
+          vehiclePhoto = File(image.path);
         }
       });
     }
@@ -112,14 +107,14 @@ class _PostRideState extends State<PostRide> {
         costPerKm < 0 ||
         costPerKm > 50) return;
 
-    if (aadhaarFile == null ||
-        driverPhoto == null ||
+    if (driverPhoto == null ||
+        vehiclePhoto == null ||
         vehicleRegC.text.isEmpty ||
         driverContactC.text.length != 10 ||
-        !RegExp(r'^\d{10}$').hasMatch(driverContactC.text)) {
-      setState(() {
-        driverContactError = 'Enter a valid 10 digit number';
-      });
+        !RegExp(r'^\d{10}$').hasMatch(driverContactC.text) ||
+        vehicleType == null ||
+        vehicleNameC.text.isEmpty ||
+        seatsC.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content: Text(
@@ -132,7 +127,7 @@ class _PostRideState extends State<PostRide> {
     try {
       final user = FirebaseAuth.instance.currentUser!;
       final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      final driverName = userDoc.data()?['name'] ?? 'Anonymous Driver';
+      final driverName = userDoc.data()?['displayName'] ?? 'Anonymous Driver';
 
       await FirebaseFirestore.instance.collection("rides").add({
         "from": fromC.text,
@@ -145,16 +140,21 @@ class _PostRideState extends State<PostRide> {
         "toLat": _toLatLng!.latitude,
         "toLng": _toLatLng!.longitude,
         "costPerKm": costPerKm,
-        "driverAadhaar": aadhaarFileName,
-        "driverPhoto": driverPhotoName,
+        "driverPhoto": driverPhoto!.path,
+        "vehiclePhoto": vehiclePhoto!.path,
         "vehicleRegNo": vehicleRegC.text,
         "driverContact": driverContactC.text,
+        "vehicleType": vehicleType,
+        "vehicleName": vehicleNameC.text,
+        "seatsAvailable": int.tryParse(seatsC.text) ?? 1,
         "createdAt": FieldValue.serverTimestamp(),
         "driverId": user.uid,
         "driverName": driverName,
       });
 
-      setState(() => loading = false);
+      if (mounted) {
+        setState(() => loading = false);
+      }
 
       if (FirebaseAuth.instance.currentUser != null) {
         NotificationService.sendRideNotification(
@@ -197,9 +197,11 @@ class _PostRideState extends State<PostRide> {
           ),
         );
       }
-    } catch (e) {
-      setState(() => loading = false);
+    } catch (e, s) {
       if (mounted) {
+        print('Error posting ride: $e');
+        print(s);
+        setState(() => loading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error posting ride: $e')),
         );
@@ -424,14 +426,42 @@ class _PostRideState extends State<PostRide> {
                 onChanged: (_) => _updateFare(),
               ),
               const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                value: vehicleType,
+                hint: const Text('Select Vehicle Type'),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    vehicleType = newValue;
+                  });
+                },
+                items: <String>['Car', 'Bike']
+                    .map<DropdownMenuItem<String>>((String value) {
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Text(value),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: vehicleNameC,
+                decoration: const InputDecoration(labelText: "Vehicle Name"),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: seatsC,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: "Available Seats"),
+              ),
+              const SizedBox(height: 10),
               Card(
                 margin: const EdgeInsets.symmetric(vertical: 8),
                 child: ListTile(
-                  leading: const Icon(Icons.upload_file, color: Colors.indigo),
-                  title: Text(aadhaarFileName == null
-                      ? 'Upload Aadhaar Card'
-                      : 'Aadhaar: $aadhaarFileName'),
-                  onTap: () => _pickFile('aadhaar'),
+                  leading: const Icon(Icons.person, color: Colors.indigo),
+                  title: Text(driverPhoto == null
+                      ? 'Upload Driver Photo'
+                      : 'Driver Photo Selected'),
+                  onTap: () => _pickFile('driverPhoto'),
                   tileColor: Colors.indigo.withOpacity(0.05),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
@@ -441,11 +471,11 @@ class _PostRideState extends State<PostRide> {
               Card(
                 margin: const EdgeInsets.symmetric(vertical: 8),
                 child: ListTile(
-                  leading: const Icon(Icons.person, color: Colors.indigo),
-                  title: Text(driverPhotoName == null
-                      ? 'Upload Driver Photo'
-                      : 'Driver: $driverPhotoName'),
-                  onTap: () => _pickFile('driverPhoto'),
+                  leading: const Icon(Icons.directions_car, color: Colors.indigo),
+                  title: Text(vehiclePhoto == null
+                      ? 'Upload Vehicle Photo'
+                      : 'Vehicle Photo Selected'),
+                  onTap: () => _pickFile('vehiclePhoto'),
                   tileColor: Colors.indigo.withOpacity(0.05),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),

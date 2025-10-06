@@ -4,13 +4,14 @@ import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../widgets/rating_submission_form.dart';
+import 'payment_page.dart';
 
 class RideSimulationScreen extends StatefulWidget {
   final String from;
   final String to;
   final String rideId;
   final String driverId;
+  final String bookingId;
 
   const RideSimulationScreen({
     super.key,
@@ -18,6 +19,7 @@ class RideSimulationScreen extends StatefulWidget {
     required this.to,
     required this.rideId,
     required this.driverId,
+    required this.bookingId,
   });
 
   @override
@@ -104,13 +106,19 @@ class _RideSimulationScreenState extends State<RideSimulationScreen> {
         'status': 'completed',
       });
 
+      final bookingDoc = await FirebaseFirestore.instance.collection('bookings').doc(widget.bookingId).get();
+      final bookingData = bookingDoc.data();
+      final fare = bookingData?['fare'];
+
       if (mounted) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => RatingSubmissionForm(
-              driverId: widget.driverId,
+            builder: (context) => PaymentPage(
+              bookingId: widget.bookingId,
               rideId: widget.rideId,
+              driverId: widget.driverId,
+              fare: fare is num ? fare.toDouble() : double.tryParse(fare.toString()) ?? 0.0,
             ),
           ),
         );

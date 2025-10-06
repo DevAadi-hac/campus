@@ -6,10 +6,23 @@ import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
 import 'ride_simulation_screen.dart';
+import 'feedback_page.dart';
 
 class PaymentPage extends StatefulWidget {
-  final Map<String, dynamic> ride;
-  const PaymentPage({super.key, required this.ride});
+  final String? bookingId;
+  final String? rideId;
+  final String? driverId;
+  final double? fare;
+  final Map<String, dynamic>? ride;
+
+  const PaymentPage({
+    super.key,
+    this.bookingId,
+    this.rideId,
+    this.driverId,
+    this.fare,
+    this.ride,
+  });
 
   @override
   State<PaymentPage> createState() => _PaymentPageState();
@@ -30,15 +43,17 @@ class _PaymentPageState extends State<PaymentPage> {
   }
 
   void _openCheckout() {
-    // Ensure fare is a number (int/double), parse if string
     num fareValue;
-    if (widget.ride['fare'] is String) {
-      fareValue = double.tryParse(widget.ride['fare']) ?? 0;
-    } else if (widget.ride['fare'] is num) {
-      fareValue = widget.ride['fare'];
+    if (widget.fare != null) {
+      fareValue = widget.fare!;
+    } else if (widget.ride != null && widget.ride!['fare'] is String) {
+      fareValue = double.tryParse(widget.ride!['fare']) ?? 0;
+    } else if (widget.ride != null && widget.ride!['fare'] is num) {
+      fareValue = widget.ride!['fare'];
     } else {
       fareValue = 0;
     }
+
     var options = {
       'key': 'rzp_test_RBcLkRDIOCOnml', // 🔑 Replace with your Razorpay Test Key
       'amount': (fareValue * 100).toInt(), // in paise
@@ -53,77 +68,99 @@ class _PaymentPageState extends State<PaymentPage> {
   }
 
   void _handleSuccess(PaymentSuccessResponse response) async {
-    final user = FirebaseAuth.instance.currentUser!;
-    final auth = Provider.of<AuthService>(context, listen: false);
-    final profile = auth.profile;
-    
-    try {
-      // Add all relevant ride info to booking for display in MyBookings
-      final newBooking = await FirebaseFirestore.instance.collection('bookings').add({
-        'rideId': widget.ride['id'],
-        'userId': user.uid,
-        'riderName': profile?['displayName'] ?? 'N/A',
-        'riderContact': user.phoneNumber ?? 'N/A',
-        'driverId': widget.ride['driverId'],
-        'fare': widget.ride['fare'],
-        'status': 'confirmed',
+    if (widget.bookingId != null) {
+      // Post-ride payment
+      await FirebaseFirestore.instance.collection('bookings').doc(widget.bookingId).update({
+        'status': 'completed',
         'paymentId': response.paymentId,
-        'createdAt': FieldValue.serverTimestamp(),
-        'from': widget.ride['from'],
-        'to': widget.ride['to'],
-        'date': widget.ride['date'],
-        'time': widget.ride['time'],
-        'costPerKm': widget.ride['costPerKm'],
-        'vehicleRegNo': widget.ride['vehicleRegNo'],
-        'driverContact': widget.ride['driverContact'],
-        'vehiclePhoto': widget.ride['vehiclePhoto'],
       });
 
-      // Send booking notification
-      NotificationService.sendRideNotification(
-        userId: user.uid,
-        type: 'ride_booked',
-        rideData: {
-          'from': widget.ride['from'],
-          'to': widget.ride['to'],
-          'fare': widget.ride['fare'],
-          'date': widget.ride['date'],
-          'time': widget.ride['time'],
-          'paymentId': response.paymentId,
-        },
-      );
-
-      if (mounted) {
-        final from = widget.ride['from'] as String?;
-        final to = widget.ride['to'] as String?;
-        final driverId = widget.ride['driverId'] as String?;
-
-        if (from == null || to == null || driverId == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Error: Ride data is incomplete. Cannot start simulation.')),
-          );
-          Navigator.pop(context);
-          return;
-        }
-
+      if (widget.driverId != null) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => RideSimulationScreen(
-              from: from,
-              to: to,
-              rideId: widget.ride['id'],
-              driverId: driverId,
+            builder: (context) => FeedbackPage(
+              driverId: widget.driverId!,
+              bookingId: widget.bookingId!,
             ),
           ),
         );
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving booking: $e')),
+    } else {
+      // Pre-ride booking payment
+      final user = FirebaseAuth.instance.currentUser!;
+      final auth = Provider.of<AuthService>(context, listen: false);
+      final profile = auth.profile;
+
+      try {
+        // Add all relevant ride info to booking for display in MyBookings
+        final newBooking = await FirebaseFirestore.instance.collection('bookings').add({
+          'rideId': widget.ride!['id'],
+          'userId': user.uid,
+          'riderName': profile?['displayName'] ?? 'N/A',
+          'riderContact': user.phoneNumber ?? 'N/A',
+          'driverId': widget.ride!['driverId'],
+          'fare': widget.ride!['fare'],
+          'status': 'confirmed',
+          'paymentId': response.paymentId,
+          'createdAt': FieldValue.serverTimestamp(),
+          'from': widget.ride!['from'],
+          'to': widget.ride!['to'],
+          'date': widget.ride!['date'],
+          'time': widget.ride!['time'],
+          'costPerKm': widget.ride!['costPerKm'],
+          'vehicleRegNo': widget.ride!['vehicleRegNo'],
+          'driverContact': widget.ride!['driverContact'],
+          'vehiclePhoto': widget.ride!['vehiclePhoto'],
+        });
+
+        // Send booking notification
+        NotificationService.sendRideNotification(
+          userId: user.uid,
+          type: 'ride_booked',
+          rideData: {
+            'from': widget.ride!['from'],
+            'to': widget.ride!['to'],
+            'fare': widget.ride!['fare'],
+            'date': widget.ride!['date'],
+            'time': widget.ride!['time'],
+            'paymentId': response.paymentId,
+          },
         );
-        Navigator.pop(context);
+
+        if (mounted) {
+          final from = widget.ride!['from'] as String?;
+          final to = widget.ride!['to'] as String?;
+          final driverId = widget.ride!['driverId'] as String?;
+
+          if (from == null || to == null || driverId == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Error: Ride data is incomplete. Cannot start simulation.')),
+            );
+            Navigator.pop(context);
+            return;
+          }
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => RideSimulationScreen(
+                from: from,
+                to: to,
+                rideId: widget.ride!['id'],
+                driverId: driverId,
+                bookingId: newBooking.id,
+              ),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error saving booking: $e')),
+          );
+          Navigator.pop(context);
+        }
       }
     }
   }

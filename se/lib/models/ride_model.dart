@@ -9,6 +9,11 @@ class RideModel {
   String driverName;
   double fare;
   int seatsAvailable;
+  String vehicleType;
+  String vehicleName;
+  String vehiclePhotoPath;
+  String driverPhotoPath;
+  List<String> passengers;
 
   RideModel({
     required this.id,
@@ -19,6 +24,11 @@ class RideModel {
     required this.driverName,
     required this.fare,
     required this.seatsAvailable,
+    required this.vehicleType,
+    required this.vehicleName,
+    required this.vehiclePhotoPath,
+    required this.driverPhotoPath,
+    required this.passengers,
   });
 
   factory RideModel.fromMap(String id, Map<String, dynamic> m) {
@@ -31,6 +41,11 @@ class RideModel {
       driverName: m['driverName'] ?? '',
       fare: (m['fare'] ?? 0).toDouble(),
       seatsAvailable: (m['seatsAvailable'] ?? 1),
+      vehicleType: m['vehicleType'] ?? '',
+      vehicleName: m['vehicleName'] ?? '',
+      vehiclePhotoPath: m['vehiclePhoto'] ?? '',
+      driverPhotoPath: m['driverPhoto'] ?? '',
+      passengers: List<String>.from(m['passengers'] ?? []),
     );
   }
 }

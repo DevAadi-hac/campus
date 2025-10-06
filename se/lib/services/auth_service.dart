@@ -11,6 +11,12 @@ class AuthService extends ChangeNotifier {
   bool isLoading = true;
   String? _verificationId;
 
+  // Temp store for user details during verification
+  String? _aadhaar;
+  String? _name;
+  int? _age;
+  String? _gender;
+
   AuthService() {
     init();
   }
@@ -26,14 +32,24 @@ class AuthService extends ChangeNotifier {
       isLoading = false;
       notifyListeners();
     });
-
-  // Removed forced sign out to keep users logged in and avoid login buffering
   }
 
-  Future<String?> signInWithPhone(String phone) async {
+  Future<String?> signInWithPhone(
+    String phone,
+    String aadhaar,
+    String name,
+    int age,
+    String gender,
+  ) async {
     isLoading = true;
     notifyListeners();
     try {
+      // Store user details temporarily
+      _aadhaar = aadhaar;
+      _name = name;
+      _age = age;
+      _gender = gender;
+
       await _fa.verifyPhoneNumber(
         phoneNumber: phone,
         verificationCompleted: (cred) async {
@@ -80,15 +96,26 @@ class AuthService extends ChangeNotifier {
       final u = result.user!;
 
       final docRef = _fs.collection('users').doc(u.uid);
+
+      // Prepare user data
+      Map<String, dynamic> userData = {
+        'phone': u.phoneNumber,
+        'displayName': _name ?? u.displayName ?? '',
+        'aadhaar': _aadhaar,
+        'age': _age,
+        'gender': _gender,
+      };
+
+      // Check if the document exists
       final doc = await docRef.get();
       if (!doc.exists) {
-        await docRef.set({
-          'phone': u.phoneNumber,
-          'createdAt': FieldValue.serverTimestamp(),
-          'role': null, // 🔥 user must pick role later
-          'displayName': u.displayName ?? '',
-        });
+        // If it's a new user, add createdAt and role
+        userData['createdAt'] = FieldValue.serverTimestamp();
+        userData['role'] = null;
       }
+
+      // Use set with merge to create or update the document
+      await docRef.set(userData, SetOptions(merge: true));
       isLoading = false;
       notifyListeners();
       return null;
@@ -111,7 +138,7 @@ class AuthService extends ChangeNotifier {
       final docRef = _fs.collection('users').doc(user!.uid);
       await docRef.set({
         'role': role,
-        'displayName': name ?? user!.phoneNumber ?? '',
+        'displayName': name ?? profile?['displayName'] ?? user!.phoneNumber ?? '',
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
       profile = (await docRef.get()).data();

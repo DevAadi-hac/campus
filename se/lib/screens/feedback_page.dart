@@ -3,7 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class FeedbackPage extends StatefulWidget {
   final String driverId;
-  const FeedbackPage({super.key, required this.driverId});
+  final String bookingId;
+  const FeedbackPage({super.key, required this.driverId, required this.bookingId});
 
   @override
   State<FeedbackPage> createState() => _FeedbackPageState();
@@ -11,6 +12,7 @@ class FeedbackPage extends StatefulWidget {
 
 class _FeedbackPageState extends State<FeedbackPage> {
   double _rating = 3.0;
+  final _feedbackController = TextEditingController();
 
   void _submitFeedback() async {
     await FirebaseFirestore.instance
@@ -18,6 +20,12 @@ class _FeedbackPageState extends State<FeedbackPage> {
         .doc(widget.driverId)
         .collection("ratings")
         .add({"rating": _rating, "createdAt": FieldValue.serverTimestamp()});
+
+    await FirebaseFirestore.instance.collection('bookings').doc(widget.bookingId).update({
+      'status': 'completed',
+      'rating': _rating,
+      'feedback': _feedbackController.text,
+    });
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("✅ Feedback Submitted!")),
@@ -46,6 +54,17 @@ class _FeedbackPageState extends State<FeedbackPage> {
                 _rating = value;
               });
             },
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _feedbackController,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Feedback',
+              ),
+              maxLines: 3,
+            ),
           ),
           ElevatedButton(
             onPressed: _submitFeedback,

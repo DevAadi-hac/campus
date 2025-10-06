@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -6,6 +7,9 @@ import 'package:http/http.dart' as http;
 import '../widgets/app_drawer.dart';
 import 'package:campus_ride_sharing_step1/screens/payment_page.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:campus_ride_sharing_step1/services/ride_service.dart';
+import 'package:campus_ride_sharing_step1/screens/my_bookings.dart';
 
 class RiderHome extends StatefulWidget {
   const RiderHome({super.key});
@@ -262,27 +266,27 @@ class _RiderHomeState extends State<RiderHome> {
                                             ),
                                           ),
                                           ElevatedButton(
-                                            onPressed: () {
-                                              final from = ride['from'] as String?;
-                                              final to = ride['to'] as String?;
-                                              final driverId = ride['driverId'] as String?;
-
-                                              if (from == null || to == null || driverId == null) {
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(content: Text('This ride has incomplete data and cannot be booked.')),
-                                                );
-                                                return;
-                                              }
-
-                                              // Navigate to PaymentPage, pass ride info (including rideId)
+                                            onPressed: () async {
                                               final rideWithId = Map<String, dynamic>.from(ride);
                                               rideWithId['id'] = rideId;
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (_) => PaymentPage(ride: rideWithId),
-                                                ),
-                                              );
+
+                                              try {
+                                                final user = FirebaseAuth.instance.currentUser;
+                                                if (user == null) {
+                                                  throw Exception('You must be logged in to book a ride.');
+                                                }
+                                                await RideService.bookRide(rideWithId, user.uid);
+                                                Navigator.pushReplacement(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (_) => const MyBookings(),
+                                                  ),
+                                                );
+                                              } catch (e) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(content: Text('Failed to book ride: $e')),
+                                                );
+                                              }
                                             },
                                             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
                                             child: const Text("Book"),
@@ -299,8 +303,8 @@ class _RiderHomeState extends State<RiderHome> {
                                           padding: const EdgeInsets.symmetric(vertical: 4.0),
                                           child: SizedBox(
                                             height: 80,
-                                            child: Image.network(
-                                              ride['vehiclePhoto'],
+                                            child: Image.file(
+                                              File(ride['vehiclePhoto']),
                                               fit: BoxFit.cover,
                                               errorBuilder: (context, error, stackTrace) => const Text('Vehicle photo unavailable'),
                                             ),
