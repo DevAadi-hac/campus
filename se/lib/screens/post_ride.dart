@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'my_rides.dart';
 import 'my_bookings.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -18,7 +19,6 @@ class PostRide extends StatefulWidget {
 }
 
 class _PostRideState extends State<PostRide> {
-  final String googleApiKey = 'AIzaSyBZtnkBIygYn28_bCYKCHKIwquR3Xz6ZYI';
   List<dynamic> fromSuggestions = [];
   List<dynamic> toSuggestions = [];
   final fromC = TextEditingController();
@@ -98,6 +98,14 @@ class _PostRideState extends State<PostRide> {
     }
   }
 
+  Future<String> _uploadFile(File file, String rideId, String type) async {
+    final storageRef = FirebaseStorage.instance.ref().child('vehicle_photos').child(rideId).child('$type.jpg');
+    final uploadTask = storageRef.putFile(file);
+    final snapshot = await uploadTask.whenComplete(() => {});
+    final downloadUrl = await snapshot.ref.getDownloadURL();
+    return downloadUrl;
+  }
+
   Future<void> _postRide() async {
     double? costPerKm = double.tryParse(costPerKmC.text);
     if (_fromLatLng == null ||
@@ -125,11 +133,16 @@ class _PostRideState extends State<PostRide> {
     setState(() => loading = true);
 
     try {
+      final rideId = FirebaseFirestore.instance.collection("rides").doc().id;
+
+      final String driverPhotoUrl = await _uploadFile(driverPhoto!, rideId, 'driver');
+      final String vehiclePhotoUrl = await _uploadFile(vehiclePhoto!, rideId, 'vehicle');
+
       final user = FirebaseAuth.instance.currentUser!;
       final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       final driverName = userDoc.data()?['displayName'] ?? 'Anonymous Driver';
 
-      await FirebaseFirestore.instance.collection("rides").add({
+      await FirebaseFirestore.instance.collection("rides").doc(rideId).set({
         "from": fromC.text,
         "to": toC.text,
         "fare": fareC.text,
@@ -140,8 +153,8 @@ class _PostRideState extends State<PostRide> {
         "toLat": _toLatLng!.latitude,
         "toLng": _toLatLng!.longitude,
         "costPerKm": costPerKm,
-        "driverPhoto": driverPhoto!.path,
-        "vehiclePhoto": vehiclePhoto!.path,
+        "driverPhoto": driverPhotoUrl,
+        "vehiclePhoto": vehiclePhotoUrl,
         "vehicleRegNo": vehicleRegC.text,
         "driverContact": driverContactC.text,
         "vehicleType": vehicleType,
@@ -150,6 +163,7 @@ class _PostRideState extends State<PostRide> {
         "createdAt": FieldValue.serverTimestamp(),
         "driverId": user.uid,
         "driverName": driverName,
+        "rideId": rideId,
       });
 
       if (mounted) {

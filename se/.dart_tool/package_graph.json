@@ -15,12 +15,14 @@
         "firebase_storage",
         "flutter",
         "flutter_local_notifications",
+        "flutter_polyline_points",
         "fluttertoast",
         "geocoding",
         "geolocator",
         "google_maps_flutter",
         "google_places_flutter",
         "google_sign_in",
+        "http",
         "image_picker",
         "intl",
         "location",
@@ -66,6 +68,24 @@
         "test_api",
         "vector_math",
         "vm_service"
+      ]
+    },
+    {
+      "name": "http",
+      "version": "1.5.0",
+      "dependencies": [
+        "async",
+        "http_parser",
+        "meta",
+        "web"
+      ]
+    },
+    {
+      "name": "flutter_polyline_points",
+      "version": "2.1.0",
+      "dependencies": [
+        "flutter",
+        "http"
       ]
     },
     {
@@ -446,6 +466,21 @@
       ]
     },
     {
+      "name": "web",
+      "version": "1.1.1",
+      "dependencies": []
+    },
+    {
+      "name": "http_parser",
+      "version": "4.1.2",
+      "dependencies": [
+        "collection",
+        "source_span",
+        "string_scanner",
+        "typed_data"
+      ]
+    },
+    {
       "name": "firebase_core_platform_interface",
       "version": "6.0.1",
       "dependencies": [
@@ -758,11 +793,6 @@
       ]
     },
     {
-      "name": "web",
-      "version": "1.1.1",
-      "dependencies": []
-    },
-    {
       "name": "flutter_web_plugins",
       "version": "0.0.0",
       "dependencies": [
@@ -928,6 +958,13 @@
       "dependencies": []
     },
     {
+      "name": "typed_data",
+      "version": "1.4.0",
+      "dependencies": [
+        "collection"
+      ]
+    },
+    {
       "name": "plugin_platform_interface",
       "version": "2.1.8",
       "dependencies": [
@@ -969,30 +1006,10 @@
       ]
     },
     {
-      "name": "http",
-      "version": "1.5.0",
-      "dependencies": [
-        "async",
-        "http_parser",
-        "meta",
-        "web"
-      ]
-    },
-    {
       "name": "js",
       "version": "0.6.7",
       "dependencies": [
         "meta"
-      ]
-    },
-    {
-      "name": "http_parser",
-      "version": "4.1.2",
-      "dependencies": [
-        "collection",
-        "source_span",
-        "string_scanner",
-        "typed_data"
       ]
     },
     {
@@ -1029,13 +1046,6 @@
       "dependencies": [
         "meta",
         "web"
-      ]
-    },
-    {
-      "name": "typed_data",
-      "version": "1.4.0",
-      "dependencies": [
-        "collection"
       ]
     },
     {

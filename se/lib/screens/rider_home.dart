@@ -10,6 +10,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:campus_ride_sharing_step1/services/ride_service.dart';
 import 'package:campus_ride_sharing_step1/screens/my_bookings.dart';
+import 'package:campus_ride_sharing_step1/services/api_key.dart';
 
 class RiderHome extends StatefulWidget {
   const RiderHome({super.key});
@@ -37,7 +38,7 @@ class _RiderHomeState extends State<RiderHome> {
 
   /// ✅ Fetch route using Google Directions API
   Future<void> _getRoute(LatLng origin, LatLng destination) async {
-    const apiKey = "AIzaSyBZtnkBIygYn28_bCYKCHKIwquR3Xz6ZYI"; // 🔑 your Google API key here
+    const apiKey = googleApiKey; // 🔑 your Google API key here
     final url =
         "https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&key=$apiKey";
 
@@ -142,7 +143,7 @@ class _RiderHomeState extends State<RiderHome> {
   }
 
   Future<List<LatLng>> _fetchRouteForSimulation(LatLng origin, LatLng destination) async {
-    const apiKey = "AIzaSyBZtnkBIygYn28_bCYKCHKIwquR3Xz6ZYI";
+    const apiKey = googleApiKey;
     final url =
         "https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&key=$apiKey";
     final response = await http.get(Uri.parse(url));
@@ -303,8 +304,8 @@ class _RiderHomeState extends State<RiderHome> {
                                           padding: const EdgeInsets.symmetric(vertical: 4.0),
                                           child: SizedBox(
                                             height: 80,
-                                            child: Image.file(
-                                              File(ride['vehiclePhoto']),
+                                            child: Image.network(
+                                              ride['vehiclePhoto'],
                                               fit: BoxFit.cover,
                                               errorBuilder: (context, error, stackTrace) => const Text('Vehicle photo unavailable'),
                                             ),

@@ -272,6 +272,12 @@
       "languageVersion": "3.7"
     },
     {
+      "name": "flutter_polyline_points",
+      "rootUri": "file:///C:/Users/aadia/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_polyline_points-2.1.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
       "name": "flutter_test",
       "rootUri": "file:///C:/flutter/packages/flutter_test",
       "packageUri": "lib/",

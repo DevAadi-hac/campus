@@ -28,6 +28,9 @@ dependencies:
   flutter_local_notifications: ^17.2.3
   geocoding: ^2.1.0
   firebase_app_check: ^0.3.2+10
+  flutter_polyline_points: ^2.0.0
+  http: ^1.2.1
+
 
 dev_dependencies:
   flutter_test:

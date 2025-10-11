@@ -399,11 +399,11 @@ class _MyBookingsState extends State<MyBookings> {
                               padding: const EdgeInsets.symmetric(vertical: 8.0),
                               child: SizedBox(
                                 height: 80,
-                                child: Image.file(
-                                  File(booking['vehiclePhoto']),
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => const Text('Vehicle photo unavailable'),
-                                ),
+                                child: Image.network(
+                                booking['vehiclePhoto'],
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => const Text('Vehicle photo unavailable'),
+                              ),
                               ),
                             ),
                           const SizedBox(height: 12),
