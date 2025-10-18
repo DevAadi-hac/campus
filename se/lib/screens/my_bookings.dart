@@ -382,7 +382,6 @@ class _MyBookingsState extends State<MyBookings> {
                                       ],
                                     ),
                                     const Divider(height: 24),
-                                    _buildPassengerDetails(allPassengers),
                                     if (currentUserBookingData['rating'] != null) ...[
                                       Text('Your Feedback:', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                                       const SizedBox(height: 8),
