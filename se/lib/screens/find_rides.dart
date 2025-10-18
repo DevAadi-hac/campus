@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:se/screens/passenger_details_screen.dart';
 
 class FindRides extends StatelessWidget {
   const FindRides({super.key});
@@ -21,6 +22,7 @@ class FindRides extends StatelessWidget {
             children: docs.map((doc) {
               final data = doc.data() as Map<String, dynamic>;
               final driverId = data['driverId'];
+              final seatsAvailable = data['seatsAvailable'] ?? 0;
 
               return Card(
                 margin: const EdgeInsets.all(8),
@@ -48,7 +50,7 @@ class FindRides extends StatelessWidget {
                                 Row(
                                   children: [
                                     const Icon(Icons.star, color: Colors.amber, size: 16),
-                                    Text('${averageRating.toStringAsFixed(1)} ($ratingCount)'),
+                                    Text('${averageRating.toStringAsFixed(1)} ($ratingCount)')
                                   ],
                                 ),
                               if (ratingCount == 0)
@@ -56,41 +58,83 @@ class FindRides extends StatelessWidget {
                             ],
                           ),
                           Text("Fare: ₹${data['fare']}\nDate: ${data['date']} - ${data['time']}"),
+                          Text("Seats Available: $seatsAvailable")
                         ],
                       ),
                       trailing: ElevatedButton(
-                        onPressed: () async {
-                          final auth = Provider.of<AuthService>(context, listen: false);
-                          final user = auth.user;
-                          final profile = auth.profile;
+                        onPressed: seatsAvailable > 0
+                            ? () {
+                                final auth = Provider.of<AuthService>(context, listen: false);
+                                final user = auth.user;
 
-                          if (user == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Please log in to book a ride.')),
-                            );
-                            return;
-                          }
+                                if (user == null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Please log in to book a ride.')),
+                                  );
+                                  return;
+                                }
 
-                          await FirebaseFirestore.instance.collection('bookings').add({
-                            'rideId': doc.id,
-                            'driverId': data['driverId'],
-                            'userId': user.uid,
-                            'riderName': profile?['displayName'] ?? 'N/A',
-                            'riderContact': user.phoneNumber ?? 'N/A',
-                            'from': data['from'],
-                            'to': data['to'],
-                            'fare': data['fare'],
-                            'date': data['date'],
-                            'time': data['time'],
-                            'status': 'confirmed',
-                            'createdAt': FieldValue.serverTimestamp(),
-                          });
+                                showDialog(
+                                  context: context,
+                                  builder: (context) {
+                                    int numberOfSeats = 1;
+                                    return AlertDialog(
+                                      title: const Text('Number of Seats'),
+                                      content: TextField(
+                                        keyboardType: TextInputType.number,
+                                        onChanged: (value) {
+                                          numberOfSeats = int.tryParse(value) ?? 1;
+                                        },
+                                        decoration: const InputDecoration(
+                                          labelText: 'Enter number of seats',
+                                        ),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () {
+                                            Navigator.of(context).pop();
+                                          },
+                                          child: const Text('Cancel'),
+                                        ),
+                                        ElevatedButton(
+                                          onPressed: () async {
+                                            if (numberOfSeats > seatsAvailable) {
+                                              Navigator.of(context).pop();
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(content: Text('Only $seatsAvailable seats available.')),
+                                              );
+                                              return;
+                                            }
 
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Ride booked successfully!')),
-                          );
-                        },
-                        child: const Text("Book"),
+                                            Navigator.of(context).pop();
+                                            final result = await Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) => PassengerDetailsScreen(
+                                                  numberOfSeats: numberOfSeats,
+                                                  ride: {
+                                                    'id': doc.id,
+                                                    ...data,
+                                                  },
+                                                ),
+                                              ),
+                                            );
+
+                                            if (result == true) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(content: Text('Ride booked successfully!')),
+                                              );
+                                            }
+                                          },
+                                          child: const Text('Confirm'),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                              }
+                            : null,
+                        child: Text(seatsAvailable > 0 ? "Book" : "Full"),
                       ),
                     );
                   },

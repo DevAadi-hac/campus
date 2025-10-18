@@ -126,6 +126,8 @@ class _RideSimulationScreenState extends State<RideSimulationScreen> {
   Future<void> _getRoute() async {
     if (_startPoint == null || _endPoint == null) return;
 
+    print('Getting route with key: $googleApiKey'); // Debug print
+
     PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
       googleApiKey: googleApiKey,
       request: PolylineRequest(
@@ -316,6 +318,26 @@ class _RideSimulationScreenState extends State<RideSimulationScreen> {
     super.dispose();
   }
 
+  String _calculateArrivalTime() {
+    if (_eta.isEmpty || _eta == 'N/A') {
+      return 'N/A';
+    }
+
+    try {
+      final parts = _eta.split(' ');
+      if (parts.length != 2) {
+        return 'N/A';
+      }
+
+      final minutes = int.parse(parts[0]);
+      final now = DateTime.now();
+      final arrivalTime = now.add(Duration(minutes: minutes));
+      return '${arrivalTime.hour.toString().padLeft(2, '0')}:${arrivalTime.minute.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return 'N/A';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -339,27 +361,32 @@ class _RideSimulationScreenState extends State<RideSimulationScreen> {
                   polylines: _polylines,
                 ),
           Positioned(
-            top: 10,
-            left: 10,
-            right: 10,
+            top: 20,
+            left: 20,
+            right: 20,
             child: Card(
-              elevation: 4,
+              elevation: 5,
               child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Column(
-                      children: [
-                        const Text('Speed', style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text('${_speed.toStringAsFixed(1)} km/h'),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        const Text('ETA', style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text(_eta),
-                      ],
+                    Text('Speed: ${_speed.toStringAsFixed(2)} km/h', style: const TextStyle(fontSize: 16)),
+                    const SizedBox(height: 8),
+                    Text('ETA: $_eta', style: const TextStyle(fontSize: 16)),
+                    const SizedBox(height: 8),
+                    Text('Arrival Time: ${_calculateArrivalTime()}', style: const TextStyle(fontSize: 16)),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _onRideCompleted,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
+                      ),
+                      child: const Text(
+                        'Finish Ride',
+                        style: TextStyle(fontSize: 18, color: Colors.white),
+                      ),
                     ),
                   ],
                 ),

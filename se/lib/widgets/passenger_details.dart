@@ -16,7 +16,7 @@ class PassengerDetails extends StatelessWidget {
         }
         final passengerData = snapshot.data!.data() as Map<String, dynamic>?;
         if (passengerData == null) {
-          return const ListTile(title: Text("Passenger not found"));
+          return const SizedBox.shrink();
         }
 
         final name = passengerData['displayName'] ?? 'N/A';

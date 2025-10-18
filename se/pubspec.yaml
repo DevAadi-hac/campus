@@ -1,5 +1,5 @@
 name: campus_ride_sharing_step1
-description: Campus Ride Sharing - Step 1 Baseline (Firebase Auth + Roles)
+description: Ride Sharing - Step 1 Baseline (Firebase Auth + Roles)
 publish_to: "none"
 version: 1.0.0+1
 

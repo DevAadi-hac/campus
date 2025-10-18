@@ -2,7 +2,7 @@
     package="com.campus.rideshare">
 
     <application
-        android:label="Campus Ride"
+        android:label="Ride Sharing"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 

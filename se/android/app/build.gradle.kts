@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.campus.rideshare"   // ✅ Kotlin DSL uses '='
-        minSdk = 23                              // ✅ minSdkVersion -> minSdk
+        minSdk = flutter.minSdkVersion                              // ✅ minSdkVersion -> minSdk
         targetSdk = 34                           // ✅ targetSdkVersion -> targetSdk
         versionCode = flutter.versionCode        // ✅ Kotlin DSL property
         versionName = flutter.versionName        // ✅ Kotlin DSL property

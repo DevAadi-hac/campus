@@ -44,14 +44,24 @@ class AppDrawer extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.bookmark),
             title: const Text("My Bookings"),
-            onTap: () => Navigator.pushReplacement(
-              context, MaterialPageRoute(builder: (_) => const MyBookings())),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MyBookings()),
+              );
+            },
           ),
           ListTile(
             leading: const Icon(Icons.analytics),
             title: const Text("Admin Dashboard"),
-            onTap: () => Navigator.pushReplacement(
-              context, MaterialPageRoute(builder: (_) => const AdminDashboard())),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AdminDashboard()),
+              );
+            },
           ),
           const Divider(),
           ListTile(

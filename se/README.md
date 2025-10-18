@@ -1,5 +1,5 @@
 
-# Campus Ride Sharing - Step 1 Baseline
+# Ride Sharing - Step 1 Baseline
 
 ## Features
 - Firebase Authentication (Email + Google)

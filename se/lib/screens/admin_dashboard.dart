@@ -64,6 +64,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: const BackButton(),
         title: const Text('📊 Admin Dashboard'),
         actions: [
           IconButton(
@@ -97,7 +98,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     const Icon(Icons.analytics, size: 48, color: Colors.white),
                     const SizedBox(height: 8),
                     const Text(
-                      'Campus Ride Analytics',
+                      'Ride Sharing Analytics',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,

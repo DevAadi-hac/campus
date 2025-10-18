@@ -11,6 +11,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:campus_ride_sharing_step1/services/ride_service.dart';
 import 'package:campus_ride_sharing_step1/screens/my_bookings.dart';
 import 'package:campus_ride_sharing_step1/services/api_key.dart';
+import 'package:campus_ride_sharing_step1/screens/passenger_details_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:campus_ride_sharing_step1/services/auth_service.dart';
 
 class RiderHome extends StatefulWidget {
   const RiderHome({super.key});
@@ -41,6 +44,8 @@ class _RiderHomeState extends State<RiderHome> {
     const apiKey = googleApiKey; // 🔑 your Google API key here
     final url =
         "https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&key=$apiKey";
+
+    print('Directions API URL: $url'); // Print the URL for debugging
 
     final response = await http.get(Uri.parse(url));
     final data = json.decode(response.body);
@@ -248,6 +253,7 @@ class _RiderHomeState extends State<RiderHome> {
                             itemBuilder: (c, i) {
                               final ride = docs[i].data();
                               final rideId = docs[i].id;
+                              final seatsAvailable = ride['seatsAvailable'] ?? 0;
                               return Card(
                                 margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                 child: Padding(
@@ -267,30 +273,84 @@ class _RiderHomeState extends State<RiderHome> {
                                             ),
                                           ),
                                           ElevatedButton(
-                                            onPressed: () async {
-                                              final rideWithId = Map<String, dynamic>.from(ride);
-                                              rideWithId['id'] = rideId;
+                                            onPressed: seatsAvailable > 0
+                                                ? () {
+                                                    final rideWithId = Map<String, dynamic>.from(ride);
+                                                    rideWithId['id'] = rideId;
 
-                                              try {
-                                                final user = FirebaseAuth.instance.currentUser;
-                                                if (user == null) {
-                                                  throw Exception('You must be logged in to book a ride.');
-                                                }
-                                                await RideService.bookRide(rideWithId, user.uid);
-                                                Navigator.pushReplacement(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (_) => const MyBookings(),
-                                                  ),
-                                                );
-                                              } catch (e) {
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  SnackBar(content: Text('Failed to book ride: $e')),
-                                                );
-                                              }
-                                            },
-                                            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                                            child: const Text("Book"),
+                                                    final auth = Provider.of<AuthService>(context, listen: false);
+                                                    final user = auth.user;
+
+                                                    if (user == null) {
+                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                        const SnackBar(content: Text('Please log in to book a ride.')),
+                                                      );
+                                                      return;
+                                                    }
+
+                                                    showDialog(
+                                                      context: context,
+                                                      builder: (context) {
+                                                        int numberOfSeats = 1;
+                                                        List<int> seatOptions = List<int>.generate(seatsAvailable, (i) => i + 1);
+                                                        if (!seatOptions.contains(numberOfSeats)) {
+                                                          numberOfSeats = seatOptions.isNotEmpty ? seatOptions.first : 0;
+                                                        }
+
+                                                        return StatefulBuilder(
+                                                          builder: (BuildContext context, StateSetter setState) {
+                                                            return AlertDialog(
+                                                              title: const Text('Select Number of Seats'),
+                                                              content: DropdownButton<int>(
+                                                                value: numberOfSeats,
+                                                                onChanged: (int? newValue) {
+                                                                  if (newValue != null) {
+                                                                    setState(() {
+                                                                      numberOfSeats = newValue;
+                                                                    });
+                                                                  }
+                                                                },
+                                                                items: seatOptions.map<DropdownMenuItem<int>>((int value) {
+                                                                  return DropdownMenuItem<int>(
+                                                                    value: value,
+                                                                    child: Text(value.toString()),
+                                                                  );
+                                                                }).toList(),
+                                                              ),
+                                                              actions: [
+                                                                TextButton(
+                                                                  onPressed: () {
+                                                                    Navigator.of(context).pop();
+                                                                  },
+                                                                  child: const Text('Cancel'),
+                                                                ),
+                                                                ElevatedButton(
+                                                                  onPressed: () {
+                                                                    Navigator.of(context).pop();
+                                                                    Navigator.push(
+                                                                      context,
+                                                                      MaterialPageRoute(
+                                                                        builder: (context) => PassengerDetailsScreen(
+                                                                          numberOfSeats: numberOfSeats,
+                                                                          ride: rideWithId,
+                                                                        ),
+                                                                      ),
+                                                                    );
+                                                                  },
+                                                                  child: const Text('Confirm'),
+                                                                ),
+                                                              ],
+                                                            );
+                                                          },
+                                                        );
+                                                      },
+                                                    );
+                                                  }
+                                                : null,
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: seatsAvailable > 0 ? Colors.green : Colors.grey,
+                                            ),
+                                            child: Text(seatsAvailable > 0 ? "Book" : "Full"),
                                           ),
                                         ],
                                       ),

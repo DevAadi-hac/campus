@@ -3,6 +3,7 @@ import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
+import '../models/passenger_model.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
 import 'ride_simulation_screen.dart';
@@ -14,6 +15,7 @@ class PaymentPage extends StatefulWidget {
   final String? driverId;
   final double? fare;
   final Map<String, dynamic>? ride;
+  final List<Passenger>? passengers;
 
   const PaymentPage({
     super.key,
@@ -22,6 +24,7 @@ class PaymentPage extends StatefulWidget {
     this.driverId,
     this.fare,
     this.ride,
+    this.passengers,
   });
 
   @override
@@ -100,7 +103,7 @@ class _PaymentPageState extends State<PaymentPage> {
           'riderName': profile?['displayName'] ?? 'N/A',
           'riderContact': user.phoneNumber ?? 'N/A',
           'driverId': widget.ride!['driverId'],
-          'fare': widget.ride!['fare'],
+          'fare': widget.fare,
           'status': 'confirmed',
           'paymentId': response.paymentId,
           'createdAt': FieldValue.serverTimestamp(),
@@ -112,6 +115,8 @@ class _PaymentPageState extends State<PaymentPage> {
           'vehicleRegNo': widget.ride!['vehicleRegNo'],
           'driverContact': widget.ride!['driverContact'],
           'vehiclePhoto': widget.ride!['vehiclePhoto'],
+          'passengers': widget.passengers?.map((p) => p.toMap()).toList(),
+          'numberOfSeats': widget.passengers?.length,
         });
 
         // Send booking notification
@@ -121,7 +126,7 @@ class _PaymentPageState extends State<PaymentPage> {
           rideData: {
             'from': widget.ride!['from'],
             'to': widget.ride!['to'],
-            'fare': widget.ride!['fare'],
+            'fare': widget.fare,
             'date': widget.ride!['date'],
             'time': widget.ride!['time'],
             'paymentId': response.paymentId,
@@ -129,9 +134,9 @@ class _PaymentPageState extends State<PaymentPage> {
         );
 
         if (mounted) {
-          final from = widget.ride!['from'] as String?;
-          final to = widget.ride!['to'] as String?;
-          final driverId = widget.ride!['driverId'] as String?;
+          final from = widget.ride!['from']?.toString();
+          final to = widget.ride!['to']?.toString();
+          final driverId = widget.ride!['driverId']?.toString();
 
           if (from == null || to == null || driverId == null) {
             ScaffoldMessenger.of(context).showSnackBar(
