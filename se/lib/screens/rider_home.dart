@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -23,501 +22,323 @@ class RiderHome extends StatefulWidget {
 }
 
 class _RiderHomeState extends State<RiderHome> {
-  GoogleMapController? mapController;
-  final LatLng _center = const LatLng(22.3072, 73.1812);
-
-  Set<Polyline> _polylines = {};
-  List<LatLng> _routeCoords = [];
+  GoogleMapController? _mapController;
+  final LatLng _center = const LatLng(22.3072, 73.1812); // Vadodara
 
   bool _sharingLocation = false;
-  bool _showSimulation = false;
-  List<LatLng> _simRoute = [];
-  String? _lastDriverId;
-  bool _showThankYou = false;
 
   void _onMapCreated(GoogleMapController controller) {
-    mapController = controller;
-  }
-
-  /// ✅ Fetch route using Google Directions API
-  Future<void> _getRoute(LatLng origin, LatLng destination) async {
-    const apiKey = googleApiKey; // 🔑 your Google API key here
-    final url =
-        "https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&key=$apiKey";
-
-    print('Directions API URL: $url'); // Print the URL for debugging
-
-    final response = await http.get(Uri.parse(url));
-    final data = json.decode(response.body);
-
-    if (data["routes"].isNotEmpty) {
-      final points = data["routes"][0]["overview_polyline"]["points"];
-      _routeCoords = _decodePolyline(points);
-
-      setState(() {
-        _polylines.clear();
-        _polylines.add(Polyline(
-          polylineId: const PolylineId("route"),
-          visible: true,
-          width: 5,
-          color: Colors.blue,
-          points: _routeCoords,
-        ));
-      });
-    }
-  }
-
-  List<LatLng> _decodePolyline(String poly) {
-    List<LatLng> points = [];
-    int index = 0, len = poly.length;
-    int lat = 0, lng = 0;
-
-    while (index < len) {
-      int b, shift = 0, result = 0;
-      do {
-        b = poly.codeUnitAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      int dlat = (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
-      lat += dlat;
-
-      shift = 0;
-      result = 0;
-      do {
-        b = poly.codeUnitAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      int dlng = (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
-      lng += dlng;
-
-      points.add(LatLng(lat / 1E5, lng / 1E5));
-    }
-    return points;
+    _mapController = controller;
   }
 
   Future<void> _requestLocationPermission() async {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Enable Location'),
-        content: const Text(
-            'To share your location with the driver, please enable location services.'),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              // Request location permission using geolocator
-              await Geolocator.requestPermission();
-              // Optionally, check if location services are enabled
-              // bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-            },
-            child: const Text('Turn On'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void startRouteSimulation() {
-    setState(() {
-      _showSimulation = true;
-    });
-  }
-
-  void completeRouteSimulation() {
-    setState(() {
-      _showSimulation = false;
-      _showThankYou = true;
-    });
-    // Show thank you and feedback dialog
-    Future.delayed(const Duration(milliseconds: 500), () {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => ThankYouFeedbackDialog(driverId: _lastDriverId ?? "demo_driver"),
-      ).then((_) {
-        setState(() { _showThankYou = false; });
-      });
-    });
-  }
-
-  Future<List<LatLng>> _fetchRouteForSimulation(LatLng origin, LatLng destination) async {
-    const apiKey = googleApiKey;
-    final url =
-        "https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&key=$apiKey";
-    final response = await http.get(Uri.parse(url));
-    final data = json.decode(response.body);
-    if (data["routes"].isNotEmpty) {
-      final points = data["routes"][0]["overview_polyline"]["points"];
-      return _decodePolyline(points);
+    final permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      await Geolocator.requestPermission();
     }
-    return [origin, destination];
+  }
+
+  void _toggleLocationSharing(bool share) {
+    if (share) {
+      _requestLocationPermission();
+    }
+    setState(() {
+      _sharingLocation = share;
+    });
+    // Logic to start/stop sharing location would go here
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Rider Home")),
+      appBar: AppBar(
+        title: const Text("Find a Ride"),
+        elevation: 0,
+      ),
       drawer: const AppDrawer(),
       body: Stack(
         children: [
-          // 🌍 Map with driver markers + route
-          StreamBuilder(
-            stream: FirebaseFirestore.instance
-                .collection("drivers")
-                .where("sharingLocation", isEqualTo: true)
-                .snapshots(),
-            builder: (context, snapshot) {
-              final markers = <Marker>{};
-              if (snapshot.hasData) {
-                for (var doc in snapshot.data!.docs) {
-                  final data = doc.data();
-                  if (data['lat'] != null && data['lng'] != null) {
-                    final driverPos = LatLng(data['lat'], data['lng']);
-                    markers.add(Marker(
-                      markerId: MarkerId(doc.id),
-                      position: driverPos,
-                      infoWindow: InfoWindow(title: data['name'] ?? "Driver"),
-                      icon: BitmapDescriptor.defaultMarkerWithHue(
-                          BitmapDescriptor.hueBlue),
-                    ));
-                  }
-                }
-              }
-              return GoogleMap(
-                onMapCreated: _onMapCreated,
-                initialCameraPosition:
-                    CameraPosition(target: _center, zoom: 13),
-                markers: markers,
-                polylines: _polylines,
-                myLocationEnabled: true,
-                myLocationButtonEnabled: true,
-              );
-            },
-          ),
-
-          // 📌 Bottom sheet with rides
-          DraggableScrollableSheet(
-            initialChildSize: 0.25,
-            minChildSize: 0.2,
-            maxChildSize: 0.6,
-            builder: (context, scrollController) {
-              return Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(20)),
-                  boxShadow: [BoxShadow(blurRadius: 10, color: Colors.black26)],
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 5,
-                      margin: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[400],
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    const Text(
-                      "Available Rides",
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 10),
-                    Expanded(
-                      child: StreamBuilder(
-                        stream: FirebaseFirestore.instance
-                            .collection("rides")
-                            .snapshots(),
-                        builder: (context, snapshot) {
-                          if (!snapshot.hasData) {
-                            return const Center(
-                                child: CircularProgressIndicator());
-                          }
-                          final docs = snapshot.data!.docs;
-                          if (docs.isEmpty) {
-                            return const Center(
-                                child: Text("No rides available"));
-                          }
-                          return ListView.builder(
-                            controller: scrollController,
-                            itemCount: docs.length,
-                            itemBuilder: (c, i) {
-                              final ride = docs[i].data();
-                              final rideId = docs[i].id;
-                              final seatsAvailable = ride['seatsAvailable'] ?? 0;
-                              return Card(
-                                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(10.0),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          const Icon(Icons.directions_car, color: Colors.indigo),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              // Show place/landmark names instead of coordinates
-                                              (ride['from'] ?? 'Unknown') + ' → ' + (ride['to'] ?? 'Unknown'),
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                            ),
-                                          ),
-                                          ElevatedButton(
-                                            onPressed: seatsAvailable > 0
-                                                ? () {
-                                                    final rideWithId = Map<String, dynamic>.from(ride);
-                                                    rideWithId['id'] = rideId;
-
-                                                    final auth = Provider.of<AuthService>(context, listen: false);
-                                                    final user = auth.user;
-
-                                                    if (user == null) {
-                                                      ScaffoldMessenger.of(context).showSnackBar(
-                                                        const SnackBar(content: Text('Please log in to book a ride.')),
-                                                      );
-                                                      return;
-                                                    }
-
-                                                    showDialog(
-                                                      context: context,
-                                                      builder: (context) {
-                                                        int numberOfSeats = 1;
-                                                        List<int> seatOptions = List<int>.generate(seatsAvailable, (i) => i + 1);
-                                                        if (!seatOptions.contains(numberOfSeats)) {
-                                                          numberOfSeats = seatOptions.isNotEmpty ? seatOptions.first : 0;
-                                                        }
-
-                                                        return StatefulBuilder(
-                                                          builder: (BuildContext context, StateSetter setState) {
-                                                            return AlertDialog(
-                                                              title: const Text('Select Number of Seats'),
-                                                              content: DropdownButton<int>(
-                                                                value: numberOfSeats,
-                                                                onChanged: (int? newValue) {
-                                                                  if (newValue != null) {
-                                                                    setState(() {
-                                                                      numberOfSeats = newValue;
-                                                                    });
-                                                                  }
-                                                                },
-                                                                items: seatOptions.map<DropdownMenuItem<int>>((int value) {
-                                                                  return DropdownMenuItem<int>(
-                                                                    value: value,
-                                                                    child: Text(value.toString()),
-                                                                  );
-                                                                }).toList(),
-                                                              ),
-                                                              actions: [
-                                                                TextButton(
-                                                                  onPressed: () {
-                                                                    Navigator.of(context).pop();
-                                                                  },
-                                                                  child: const Text('Cancel'),
-                                                                ),
-                                                                ElevatedButton(
-                                                                  onPressed: () {
-                                                                    Navigator.of(context).pop();
-                                                                    Navigator.push(
-                                                                      context,
-                                                                      MaterialPageRoute(
-                                                                        builder: (context) => PassengerDetailsScreen(
-                                                                          numberOfSeats: numberOfSeats,
-                                                                          ride: rideWithId,
-                                                                        ),
-                                                                      ),
-                                                                    );
-                                                                  },
-                                                                  child: const Text('Confirm'),
-                                                                ),
-                                                              ],
-                                                            );
-                                                          },
-                                                        );
-                                                      },
-                                                    );
-                                                  }
-                                                : null,
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: seatsAvailable > 0 ? Colors.green : Colors.grey,
-                                            ),
-                                            child: Text(seatsAvailable > 0 ? "Book" : "Full"),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text("Fare: ₹${ride['fare']} | Date: ${ride['date']} | Time: ${ride['time']}", style: const TextStyle(fontSize: 14)),
-                                      if (ride['costPerKm'] != null) Text("Cost per km: ₹${ride['costPerKm']}", style: const TextStyle(fontSize: 13)),
-                                      if (ride['vehicleRegNo'] != null) Text("Vehicle Reg No: ${ride['vehicleRegNo']}", style: const TextStyle(fontSize: 13)),
-                                      if (ride['driverContact'] != null) Text("Driver Contact: ${ride['driverContact']}", style: const TextStyle(fontSize: 13)),
-                                      if (ride['vehiclePhoto'] != null && ride['vehiclePhoto'].toString().isNotEmpty)
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(vertical: 4.0),
-                                          child: SizedBox(
-                                            height: 80,
-                                            child: Image.network(
-                                              ride['vehiclePhoto'],
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (context, error, stackTrace) => const Text('Vehicle photo unavailable'),
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          // Toggle for sharing location with driver
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Share location with driver'),
-                Switch(
-                  value: _sharingLocation,
-                  onChanged: (val) {
-                    setState(() {
-                      _sharingLocation = val;
-                    });
-                    if (val) {
-                      _requestLocationPermission();
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-          if (_showSimulation)
-            RouteSimulationOverlay(onComplete: completeRouteSimulation),
+          _buildGoogleMap(),
+          _buildAvailableRidesSheet(),
         ],
       ),
     );
   }
-}
 
-class RouteSimulationOverlay extends StatefulWidget {
-  final VoidCallback onComplete;
-  const RouteSimulationOverlay({required this.onComplete, super.key});
+  Widget _buildGoogleMap() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection("drivers").where("sharingLocation", isEqualTo: true).snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(child: Text("Error loading map data: ${snapshot.error}"));
+        }
 
-  @override
-  State<RouteSimulationOverlay> createState() => _RouteSimulationOverlayState();
-}
-
-class _RouteSimulationOverlayState extends State<RouteSimulationOverlay> {
-  double progress = 0;
-  late final int duration;
-
-  @override
-  void initState() {
-    super.initState();
-    duration = 15; // 15 seconds
-    _startSimulation();
+        final markers = <Marker>{};
+        if (snapshot.hasData) {
+          for (var doc in snapshot.data!.docs) {
+            final data = doc.data() as Map<String, dynamic>;
+            if (data['lat'] != null && data['lng'] != null) {
+              markers.add(Marker(
+                markerId: MarkerId(doc.id),
+                position: LatLng(data['lat'], data['lng']),
+                infoWindow: InfoWindow(title: data['name'] ?? "Driver"),
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+              ));
+            }
+          }
+        }
+        return GoogleMap(
+          onMapCreated: _onMapCreated,
+          initialCameraPosition: CameraPosition(target: _center, zoom: 13),
+          markers: markers,
+          myLocationEnabled: true,
+          myLocationButtonEnabled: true,
+          padding: const EdgeInsets.only(bottom: 200), // Adjust padding for the sheet
+        );
+      },
+    );
   }
 
-  void _startSimulation() {
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(milliseconds: 300));
-      setState(() {
-        progress += 1 / (duration * 3.3);
-      });
-      if (progress >= 1) {
-        widget.onComplete();
-        return false;
-      }
-      return true;
-    });
+  Widget _buildAvailableRidesSheet() {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.3,
+      minChildSize: 0.25,
+      maxChildSize: 0.8,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).canvasColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            boxShadow: [BoxShadow(blurRadius: 10, color: Colors.black.withOpacity(0.2))],
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 40,
+                height: 5,
+                margin: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 8, 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text("Available Rides", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    Row(
+                      children: [
+                        const Text("Share Location"),
+                        Switch(
+                          value: _sharingLocation,
+                          onChanged: _toggleLocationSharing,
+                        ),
+                      ],
+                    )
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance.collection("rides").where('seatsAvailable', isGreaterThan: 0).snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Center(child: Text("Error loading rides: ${snapshot.error}"));
+                    }
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      return _buildEmptyState();
+                    }
+                    final docs = snapshot.data!.docs;
+                    return ListView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.all(8.0),
+                      itemCount: docs.length,
+                      itemBuilder: (c, i) {
+                        final ride = docs[i].data() as Map<String, dynamic>;
+                        final rideId = docs[i].id;
+                        return _buildRideCard(ride, rideId);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.black.withOpacity(0.8),
-      child: Center(
+  Widget _buildRideCard(Map<String, dynamic> ride, String rideId) {
+    final seatsAvailable = ride['seatsAvailable'] ?? 0;
+    final driverId = ride['driverId'] as String?;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Simulating your ride...', style: TextStyle(color: Colors.white, fontSize: 24)),
-            const SizedBox(height: 30),
-            LinearProgressIndicator(value: progress, minHeight: 10, backgroundColor: Colors.white24, color: Colors.green),
-            const SizedBox(height: 20),
-            Text('${(progress * duration).toInt()} / $duration sec', style: const TextStyle(color: Colors.white)),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: (ride['vehiclePhoto'] != null && ride['vehiclePhoto'].toString().isNotEmpty)
+                  ? CircleAvatar(backgroundImage: NetworkImage(ride['vehiclePhoto']))
+                  : const CircleAvatar(child: Icon(Icons.directions_car, color: Colors.white)),
+              title: Text("${ride['from'] ?? 'Unknown'} → ${ride['to'] ?? 'Unknown'}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              subtitle: (driverId == null || driverId.isEmpty)
+                  ? const Text("Driver not specified", style: TextStyle(color: Colors.red))
+                  : FutureBuilder<DocumentSnapshot>(
+                      future: FirebaseFirestore.instance.collection('drivers').doc(driverId).get(),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return const Text('Error loading driver', style: TextStyle(color: Colors.red));
+                        }
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Text('Driver: loading...');
+                        }
+                        if (!snapshot.hasData || !snapshot.data!.exists) {
+                          return const Text('Driver not found', style: TextStyle(color: Colors.red));
+                        }
+                        final driverData = snapshot.data!.data() as Map<String, dynamic>?;
+                        final driverName = driverData?['displayName'] ?? 'Driver';
+                        final avgRating = driverData?['averageRating'] as double? ?? 0.0;
+                        return Text('$driverName (⭐ ${avgRating.toStringAsFixed(1)})');
+                      },
+                    ),
+            ),
+            const Divider(),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Wrap(
+                spacing: 8.0,
+                runSpacing: 4.0,
+                children: [
+                  _buildInfoChip(Icons.calendar_today, "${ride['date']} at ${ride['time']}"),
+                  _buildInfoChip(Icons.airline_seat_recline_normal, '$seatsAvailable Seats Left', color: Colors.green),
+                ],
+              ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text("₹${ride['fare']}", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green)),
+                ElevatedButton.icon(
+                  onPressed: () => _showSeatSelector(context, ride, rideId, seatsAvailable),
+                  icon: const Icon(Icons.check_circle_outline, size: 18),
+                  label: const Text("Book Now"),
+                  style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            ExpansionTile(
+              title: const Text('More Info', style: TextStyle(fontWeight: FontWeight.w600)),
+              tilePadding: EdgeInsets.zero,
+              children: [
+                _buildDetailRow(Icons.person_outline, 'Driver Contact', ride['driverContact'] ?? 'N/A'),
+                _buildDetailRow(Icons.car_rental_outlined, 'Vehicle', "${ride['vehicleName'] ?? 'N/A'} (${ride['vehicleType'] ?? 'N/A'})"),
+                _buildDetailRow(Icons.pin_outlined, 'Vehicle Number', ride['vehicleRegNo'] ?? 'N/A'),
+              ],
+            )
           ],
         ),
       ),
     );
   }
-}
 
-class ThankYouFeedbackDialog extends StatefulWidget {
-  final String driverId;
-  const ThankYouFeedbackDialog({required this.driverId, super.key});
-
-  @override
-  State<ThankYouFeedbackDialog> createState() => _ThankYouFeedbackDialogState();
-}
-
-class _ThankYouFeedbackDialogState extends State<ThankYouFeedbackDialog> {
-  double _rating = 3.0;
-  bool _submitted = false;
-
-  Future<void> _submitFeedback() async {
-    await FirebaseFirestore.instance
-        .collection("drivers")
-        .doc(widget.driverId)
-        .collection("ratings")
-        .add({"rating": _rating, "createdAt": FieldValue.serverTimestamp()});
-    setState(() { _submitted = true; });
-    await Future.delayed(const Duration(seconds: 2));
-    Navigator.of(context).pop();
+  Widget _buildDetailRow(IconData icon, String title, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: Colors.grey[700]),
+          const SizedBox(width: 12),
+          Text('$title: ', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Expanded(child: Text(value, textAlign: TextAlign.end)),
+        ],
+      ),
+    );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Thank you for traveling!'),
-      content: _submitted
-          ? const Text('Feedback submitted!')
-          : Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Please rate your ride:'),
-                Slider(
-                  value: _rating,
-                  min: 1,
-                  max: 5,
-                  divisions: 4,
-                  label: _rating.toStringAsFixed(1),
-                  onChanged: (val) => setState(() => _rating = val),
+  void _showSeatSelector(BuildContext context, Map<String, dynamic> ride, String rideId, int seatsAvailable) {
+    final auth = Provider.of<AuthService>(context, listen: false);
+    if (auth.user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please log in to book a ride.')));
+      return;
+    }
+
+    int numberOfSeats = 1;
+    List<int> seatOptions = List<int>.generate(seatsAvailable, (i) => i + 1);
+    if (seatOptions.isEmpty) return;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            return AlertDialog(
+              title: const Text('Select Number of Seats'),
+              content: DropdownButton<int>(
+                value: numberOfSeats,
+                isExpanded: true,
+                onChanged: (int? newValue) {
+                  if (newValue != null) setState(() => numberOfSeats = newValue);
+                },
+                items: seatOptions.map<DropdownMenuItem<int>>((int value) {
+                  return DropdownMenuItem<int>(value: value, child: Text("$value Seat${value > 1 ? 's' : ''}"));
+                }).toList(),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    final rideWithId = Map<String, dynamic>.from(ride);
+                    rideWithId['id'] = rideId;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PassengerDetailsScreen(numberOfSeats: numberOfSeats, ride: rideWithId),
+                      ),
+                    );
+                  },
+                  child: const Text('Confirm'),
                 ),
               ],
-            ),
-      actions: _submitted
-          ? []
-          : [
-              TextButton(
-                onPressed: _submitFeedback,
-                child: const Text('Submit'),
-              ),
-            ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildInfoChip(IconData icon, String text, {Color? color}) {
+    return Chip(
+      avatar: Icon(icon, size: 16, color: color ?? Colors.grey[600]),
+      label: Text(text, style: TextStyle(color: color ?? Colors.grey[700])),
+      backgroundColor: color?.withOpacity(0.1) ?? Colors.grey[200],
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.directions_car_outlined, size: 80, color: Colors.grey[400]),
+          const SizedBox(height: 20),
+          Text("No rides available right now.", style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text("Please check back later.", style: Theme.of(context).textTheme.bodyMedium),
+        ],
+      ),
     );
   }
 }

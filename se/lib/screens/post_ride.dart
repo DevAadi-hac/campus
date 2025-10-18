@@ -147,6 +147,24 @@ class _PostRideState extends State<PostRide> {
       final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       final driverName = userDoc.data()?['displayName'] ?? 'Anonymous Driver';
 
+      // Ensure a document for the driver exists with their name.
+      final driverRef = FirebaseFirestore.instance.collection('drivers').doc(user.uid);
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final driverDoc = await transaction.get(driverRef);
+        if (!driverDoc.exists) {
+          transaction.set(driverRef, {
+            'displayName': driverName,
+            'uid': user.uid,
+            'averageRating': 0.0,
+            'ratingCount': 0,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        } else {
+          // If it exists, just ensure the displayName is up-to-date.
+          transaction.update(driverRef, {'displayName': driverName});
+        }
+      });
+
       await FirebaseFirestore.instance.collection("rides").doc(rideId).set({
         "from": fromC.text,
         "to": toC.text,

@@ -31,47 +31,41 @@ class _MyBookingsState extends State<MyBookings> {
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('All Passengers:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 8),
-        ...passengers.map((passenger) {
-          return Card(
-            elevation: 1,
-            margin: const EdgeInsets.symmetric(vertical: 4),
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Column(
+      children: passengers.map((passenger) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: Row(
+            children: [
+              Icon(Icons.person, color: Theme.of(context).primaryColor, size: 20),
+              const SizedBox(width: 12),
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Name: ${passenger['name'] ?? 'N/A'}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  Text('Age: ${passenger['age'] ?? 'N/A'}'),
-                  const SizedBox(height: 4),
-                  Text('Gender: ${passenger['gender'] ?? 'N/A'}'),
-                  const SizedBox(height: 4),
-                  Text('Aadhaar: ${maskAadhaar(passenger['aadhaarNumber'])}'),
+                  Text('Age: ${passenger['age'] ?? 'N/A'}', style: TextStyle(color: Colors.grey[600])),
+                  Text('Gender: ${passenger['gender'] ?? 'N/A'}', style: TextStyle(color: Colors.grey[600])),
+                  Text('Aadhaar: ${maskAadhaar(passenger['aadhaarNumber'])}', style: TextStyle(color: Colors.grey[600])),
                 ],
               ),
-            ),
-          );
-        }).toList(),
-      ],
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 
   Future<void> _cancelBooking(String bookingId, Map<String, dynamic> bookingData) async {
-    // Show confirmation dialog
     final bool? confirmCancel = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Row(
+        title: const Row(
           children: [
             Icon(Icons.warning, color: Colors.orange, size: 28),
             SizedBox(width: 8),
             Text('Cancel Booking'),
           ],
         ),
-        content: Column(
+        content: const Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -84,19 +78,18 @@ class _MyBookingsState extends State<MyBookings> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text('Keep Booking'),
+            child: const Text('Keep Booking'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: Text('Cancel Booking', style: TextStyle(color: Colors.white)),
+            child: const Text('Cancel Booking', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
 
     if (confirmCancel == true) {
-      // Show sad emoji feedback dialog
       await _showCancelFeedbackDialog(bookingId, bookingData);
     }
   }
@@ -107,7 +100,7 @@ class _MyBookingsState extends State<MyBookings> {
       barrierDismissible: false,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Row(
+          title: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text('😢', style: TextStyle(fontSize: 28)),
@@ -125,13 +118,13 @@ class _MyBookingsState extends State<MyBookings> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
+                const Text(
                   'We\'re sorry to see you go! Please let us know why you\'re canceling:',
                   style: TextStyle(fontSize: 14),
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 TextField(
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     hintText: 'Tell us why you\'re canceling...',
                     border: OutlineInputBorder(),
                     contentPadding: EdgeInsets.all(12),
@@ -153,7 +146,7 @@ class _MyBookingsState extends State<MyBookings> {
                 Navigator.of(context).pop();
                 _processCancellation(bookingId, booking);
               },
-              child: Text('Skip'),
+              child: const Text('Skip'),
             ),
             ElevatedButton(
               onPressed: () {
@@ -161,7 +154,7 @@ class _MyBookingsState extends State<MyBookings> {
                 _processCancellation(bookingId, booking);
               },
               style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-              child: Text('Submit', style: TextStyle(color: Colors.white)),
+              child: const Text('Submit', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -178,19 +171,16 @@ class _MyBookingsState extends State<MyBookings> {
       final rideId = booking['rideId'];
       final numberOfCancelledSeats = (booking['passengers'] as List).length;
 
-      // Update booking status to cancelled
       await FirebaseFirestore.instance.collection('bookings').doc(bookingId).update({
         'status': 'cancelled',
         'cancelledAt': FieldValue.serverTimestamp(),
         'cancelFeedback': _cancelFeedback ?? 'No feedback provided',
       });
 
-      // Add back the seats to the ride
       await FirebaseFirestore.instance.collection('rides').doc(rideId).update({
         'seatsAvailable': FieldValue.increment(numberOfCancelledSeats),
       });
 
-      // Send cancellation notification
       if (FirebaseAuth.instance.currentUser != null) {
         NotificationService.sendRideNotification(
           userId: FirebaseAuth.instance.currentUser!.uid,
@@ -206,10 +196,9 @@ class _MyBookingsState extends State<MyBookings> {
         );
       }
 
-      // Show success message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text('Booking cancelled successfully! Refund will be processed soon.'),
             backgroundColor: Colors.orange,
             duration: Duration(seconds: 3),
@@ -273,7 +262,6 @@ class _MyBookingsState extends State<MyBookings> {
     if (user == null) {
       return Scaffold(
         appBar: AppBar(
-          leading: const BackButton(),
           title: const Text("My Bookings"),
         ),
         body: const Center(child: Text("Please log in to see your bookings.")),
@@ -282,7 +270,6 @@ class _MyBookingsState extends State<MyBookings> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: const BackButton(),
         title: const Text("My Bookings"),
       ),
       body: Stack(
@@ -290,20 +277,35 @@ class _MyBookingsState extends State<MyBookings> {
           StreamBuilder<QuerySnapshot>(
             stream: RideService.streamUserBookings(user.uid),
             builder: (context, userBookingsSnapshot) {
-              if (!userBookingsSnapshot.hasData) {
+              if (userBookingsSnapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
-              final userBookingDocs = userBookingsSnapshot.data!.docs;
-              if (userBookingDocs.isEmpty) {
-                return const Center(child: Text("No bookings yet"));
+              if (!userBookingsSnapshot.hasData || userBookingsSnapshot.data!.docs.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.event_busy, size: 80, color: Colors.grey[400]),
+                      const SizedBox(height: 20),
+                      Text("You have no bookings yet.", style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: 8),
+                      Text("Find a ride and start your journey!", style: Theme.of(context).textTheme.bodyMedium),
+                    ],
+                  ),
+                );
               }
 
-              final rideIds = userBookingDocs.map((doc) => (doc.data() as Map<String,dynamic>)['rideId']).toSet().toList();
+              final userBookingDocs = userBookingsSnapshot.data!.docs;
+              final rideIds = userBookingDocs.map((doc) => (doc.data() as Map<String, dynamic>)['rideId']).toSet().toList();
 
               return ListView.builder(
+                padding: const EdgeInsets.all(8.0),
                 itemCount: rideIds.length,
                 itemBuilder: (c, i) {
                   final rideId = rideIds[i];
+                  final currentUserBookingDoc = userBookingDocs.firstWhere((doc) => (doc.data() as Map<String, dynamic>)['rideId'] == rideId);
+                  final currentUserBookingId = currentUserBookingDoc.id;
+                  final currentUserBookingData = currentUserBookingDoc.data() as Map<String, dynamic>;
 
                   return StreamBuilder<DocumentSnapshot>(
                     stream: FirebaseFirestore.instance.collection('rides').doc(rideId).snapshots(),
@@ -315,287 +317,16 @@ class _MyBookingsState extends State<MyBookings> {
                       if (rideData == null) {
                         return const SizedBox.shrink(); // Ride data not found
                       }
-                      final seatsAvailable = rideData['seatsAvailable'] ?? 0;
 
-                      return StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance.collection('bookings').where('rideId', isEqualTo: rideId).snapshots(),
-                        builder: (context, allBookingsSnapshot) {
-                          if (!allBookingsSnapshot.hasData) {
-                            return const Center(child: CircularProgressIndicator());
-                          }
-                          final allBookingDocs = allBookingsSnapshot.data!.docs;
-                          final allPassengers = allBookingDocs.expand((doc) => (doc.data() as Map<String, dynamic>)['passengers'] as List).toList();
-                          
-                          QueryDocumentSnapshot<Object?>? currentUserBookingDoc;
-                          for (var doc in allBookingDocs) {
-                            if ((doc.data() as Map<String, dynamic>)['userId'] == user.uid) {
-                              currentUserBookingDoc = doc;
-                              break;
-                            }
-                          }
-
-                          if (currentUserBookingDoc == null) {
-                            return const SizedBox.shrink();
-                          }
-                          final currentUserBookingId = currentUserBookingDoc.id;
-                          final currentUserBookingData = currentUserBookingDoc.data() as Map<String, dynamic>;
-
-                          final isConfirmed = currentUserBookingData['status'] == 'confirmed';
-                          final isCancelled = currentUserBookingData['status'] == 'cancelled';
-                          final isCompleted = currentUserBookingData['status'] == 'completed';
-
-                          if (isCompleted) {
-                            return Card(
-                              margin: const EdgeInsets.all(12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              elevation: 2,
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.check_circle, color: Colors.green, size: 28),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Text(
-                                            '${rideData['from'] ?? ''} → ${rideData['to'] ?? ''}',
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                          ),
-                                        ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                          decoration: BoxDecoration(
-                                            color: Colors.blue[100],
-                                            borderRadius: BorderRadius.circular(10),
-                                          ),
-                                          child: Text(
-                                            'COMPLETED',
-                                            style: TextStyle(
-                                              color: Colors.blue[800],
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const Divider(height: 24),
-                                    if (currentUserBookingData['rating'] != null) ...[
-                                      Text('Your Feedback:', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        children: [
-                                          Text('Rating: ', style: TextStyle(color: Colors.grey[600])),
-                                          for (int i = 0; i < (currentUserBookingData['rating'] as num).toInt(); i++)
-                                            const Icon(Icons.star, color: Colors.amber, size: 20),
-                                          for (int i = 0; i < 5 - (currentUserBookingData['rating'] as num).toInt(); i++)
-                                            const Icon(Icons.star_border, color: Colors.amber, size: 20),
-                                        ],
-                                      ),
-                                      if (currentUserBookingData['feedback'] != null && currentUserBookingData['feedback'].isNotEmpty) ...[
-                                        const SizedBox(height: 4),
-                                        Text('Feedback: ${currentUserBookingData['feedback']}', style: TextStyle(color: Colors.grey[600])),
-                                      ]
-                                    ] else ...[
-                                      Center(
-                                        child: OutlinedButton.icon(
-                                          onPressed: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) => FeedbackPage(
-                                                  driverId: rideData['driverId'],
-                                                  bookingId: currentUserBookingId,
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                          icon: const Icon(Icons.edit, size: 18),
-                                          label: const Text('Provide Feedback'),
-                                          style: OutlinedButton.styleFrom(
-                                            side: BorderSide(color: Theme.of(context).primaryColor),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(20),
-                                            ),
-                                          ),
-                                        ),
-                                      )
-                                    ],
-                                    const SizedBox(height: 8),
-                                    Align(
-                                      alignment: Alignment.centerRight,
-                                      child: IconButton(
-                                        icon: Icon(Icons.delete_outline, color: Colors.red[300]),
-                                        tooltip: 'Delete Booking',
-                                        onPressed: () => _deleteBooking(currentUserBookingId),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }
-
-                          return Card(
-                            margin: const EdgeInsets.all(12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            elevation: 4,
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.directions_car, color: Colors.indigo, size: 32),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          '${rideData['from'] ?? ''} → ${rideData['to'] ?? ''}',
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          color: isConfirmed ? Colors.green[100] : isCancelled ? Colors.red[100] : Colors.orange[100],
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Text(
-                                          currentUserBookingData['status']?.toUpperCase() ?? '',
-                                          style: TextStyle(
-                                            color: isConfirmed ? Colors.green[800] : isCancelled ? Colors.red[800] : Colors.orange[800],
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text('Fare: ₹${currentUserBookingData['fare']}', style: const TextStyle(fontSize: 16)),
-                                  Text('Date: ${rideData['date']} | Time: ${rideData['time']}', style: const TextStyle(fontSize: 15)),
-                                  Text(
-                                    seatsAvailable > 0 ? 'Seats Available: $seatsAvailable' : 'Seats: Full',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: seatsAvailable > 0 ? Colors.green : Colors.red,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  _buildPassengerDetails(allPassengers),
-                                  if (rideData['vehiclePhoto'] != null && rideData['vehiclePhoto'].toString().isNotEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                                      child: Center(
-                                        child: SizedBox(
-                                          height: 150,
-                                          child: Image.network(
-                                            rideData['vehiclePhoto'],
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(), // Don't show error text
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      if (isConfirmed)
-                                        Flexible(
-                                          child: Wrap(
-                                            alignment: WrapAlignment.end,
-                                            spacing: 8.0,
-                                            runSpacing: 8.0,
-                                            children: [
-                                              ElevatedButton.icon(
-                                                onPressed: () {
-                                                  Navigator.push(
-                                                    context,
-                                                    MaterialPageRoute(
-                                                      builder: (context) => ChatScreen(
-                                                        rideId: rideId,
-                                                        otherUserId: rideData['driverId'],
-                                                        otherUserName: 'Driver',
-                                                      ),
-                                                    ),
-                                                  );
-                                                },
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: Colors.green,
-                                                  foregroundColor: Colors.white,
-                                                ),
-                                                icon: const Icon(Icons.chat, size: 18),
-                                                label: const Text('Chat with Driver'),
-                                              ),
-                                              ElevatedButton.icon(
-                                                onPressed: () {
-                                                  Navigator.push(
-                                                    context,
-                                                    MaterialPageRoute(
-                                                      builder: (context) => RideSimulationScreen(
-                                                        from: rideData['from'],
-                                                        to: rideData['to'],
-                                                        rideId: rideId,
-                                                        driverId: rideData['driverId'],
-                                                        bookingId: currentUserBookingId,
-                                                      ),
-                                                    ),
-                                                  );
-                                                },
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: Colors.blue,
-                                                  foregroundColor: Colors.white,
-                                                ),
-                                                icon: const Icon(Icons.play_arrow, size: 18),
-                                                label: const Text('Simulate Ride'),
-                                              ),
-                                              ElevatedButton.icon(
-                                                onPressed: () => _cancelBooking(currentUserBookingId, currentUserBookingData),
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: Colors.red,
-                                                  foregroundColor: Colors.white,
-                                                ),
-                                                icon: const Icon(Icons.cancel, size: 18),
-                                                label: const Text('Cancel Booking'),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  if (isCancelled) ...[
-                                    const SizedBox(height: 8),
-                                    Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: Colors.red[50],
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: Colors.red[200]!),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.info, color: Colors.red[600], size: 20),
-                                          SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              'You have cancelled your booking for this ride.',
-                                              style: TextStyle(color: Colors.red[800], fontSize: 12),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      );
+                      final status = currentUserBookingData['status'] ?? 'unknown';
+                      switch (status) {
+                        case 'completed':
+                          return _buildCompletedBookingCard(currentUserBookingId, currentUserBookingData, rideData);
+                        case 'cancelled':
+                          return _buildCancelledBookingCard(currentUserBookingData, rideData);
+                        default:
+                          return _buildActiveBookingCard(currentUserBookingId, currentUserBookingData, rideData, rideId);
+                      }
                     },
                   );
                 },
@@ -611,6 +342,250 @@ class _MyBookingsState extends State<MyBookings> {
             ),
         ],
       ),
+    );
+  }
+
+  Widget _buildActiveBookingCard(String bookingId, Map<String, dynamic> bookingData, Map<String, dynamic> rideData, String rideId) {
+    final seatsAvailable = rideData['seatsAvailable'] ?? 0;
+    final isConfirmed = bookingData['status'] == 'confirmed';
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (rideData['vehiclePhoto'] != null && rideData['vehiclePhoto'].toString().isNotEmpty)
+            ClipRRect(
+              borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
+              child: Image.network(
+                rideData['vehiclePhoto'],
+                height: 150,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.directions_car, color: Theme.of(context).primaryColor, size: 32),
+                  title: Text(
+                    '${rideData['from'] ?? ''} → ${rideData['to'] ?? ''}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  trailing: _buildStatusChip(bookingData['status']),
+                ),
+                const Divider(),
+                _buildInfoRow(Icons.calendar_today, '${rideData['date']} at ${rideData['time']}'),
+                _buildInfoRow(Icons.currency_rupee, '${bookingData['fare']}'),
+                _buildInfoRow(
+                  Icons.airline_seat_recline_normal,
+                  seatsAvailable > 0 ? 'Seats Available: $seatsAvailable' : 'Ride is Full',
+                  color: seatsAvailable > 0 ? Colors.green.shade700 : Colors.red.shade700,
+                ),
+                const Divider(),
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance.collection('bookings').where('rideId', isEqualTo: rideId).snapshots(),
+                  builder: (context, allBookingsSnapshot) {
+                    if (!allBookingsSnapshot.hasData) return const SizedBox.shrink();
+                    final allPassengers = allBookingsSnapshot.data!.docs.expand((doc) => (doc.data() as Map<String, dynamic>)['passengers'] as List).toList();
+                    return ExpansionTile(
+                      title: const Text('View Passengers', style: TextStyle(fontWeight: FontWeight.w600)),
+                      children: [_buildPassengerDetails(allPassengers)],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          if (isConfirmed)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Wrap(
+                spacing: 8.0,
+                runSpacing: 4.0,
+                alignment: WrapAlignment.end,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ChatScreen(rideId: rideId, otherUserId: rideData['driverId'], otherUserName: 'Driver'))),
+                    icon: const Icon(Icons.chat, size: 18),
+                    label: const Text('Chat'),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => RideSimulationScreen(from: rideData['from'], to: rideData['to'], rideId: rideId, driverId: rideData['driverId'], bookingId: bookingId))),
+                    icon: const Icon(Icons.play_arrow, size: 18),
+                    label: const Text('Simulate'),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () => _cancelBooking(bookingId, bookingData),
+                    icon: const Icon(Icons.cancel, size: 18),
+                    label: const Text('Cancel'),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompletedBookingCard(String bookingId, Map<String, dynamic> bookingData, Map<String, dynamic> rideData) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+              title: Text(
+                '${rideData['from'] ?? ''} → ${rideData['to'] ?? ''}',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              trailing: _buildStatusChip('completed'),
+            ),
+            const Divider(height: 24),
+            if (bookingData['rating'] != null) ...[
+              const Text('Your Feedback:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text('Rating: ', style: TextStyle(color: Colors.grey[600])),
+                  for (int i = 0; i < (bookingData['rating'] as num).toInt(); i++)
+                    const Icon(Icons.star, color: Colors.amber, size: 20),
+                  for (int i = 0; i < 5 - (bookingData['rating'] as num).toInt(); i++)
+                    const Icon(Icons.star_border, color: Colors.amber, size: 20),
+                ],
+              ),
+              if (bookingData['feedback'] != null && bookingData['feedback'].isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text('Feedback: ${bookingData['feedback']}', style: TextStyle(color: Colors.grey[600])),
+              ]
+            ]
+            else
+              Center(
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => FeedbackPage(driverId: rideData['driverId'], bookingId: bookingId))),
+                  icon: const Icon(Icons.edit, size: 18),
+                  label: const Text('Provide Feedback'),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: Theme.of(context).primaryColor),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
+                ),
+              ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                icon: Icon(Icons.delete_outline, color: Colors.red[300]),
+                tooltip: 'Delete Booking',
+                onPressed: () => _deleteBooking(bookingId),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCancelledBookingCard(Map<String, dynamic> bookingData, Map<String, dynamic> rideData) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      elevation: 2,
+      color: Colors.grey[200],
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.cancel, color: Colors.red[700], size: 32),
+              title: Text(
+                '${rideData['from'] ?? ''} → ${rideData['to'] ?? ''}',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.grey[600], decoration: TextDecoration.lineThrough),
+              ),
+              trailing: _buildStatusChip('cancelled'),
+            ),
+            const Divider(),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info, color: Colors.red[600], size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'You have cancelled your booking for this ride.',
+                      style: TextStyle(color: Colors.red[800], fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String text, {Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: Colors.grey[600]),
+          const SizedBox(width: 8),
+          Text(text, style: TextStyle(fontSize: 15, color: color)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusChip(String? status) {
+    Color color;
+    String text;
+    switch (status) {
+      case 'confirmed':
+        color = Colors.green;
+        text = 'CONFIRMED';
+        break;
+      case 'cancelled':
+        color = Colors.red;
+        text = 'CANCELLED';
+        break;
+      case 'completed':
+        color = Colors.blue;
+        text = 'COMPLETED';
+        break;
+      default:
+        color = Colors.orange;
+        text = status?.toUpperCase() ?? 'PENDING';
+    }
+    return Chip(
+      label: Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+      backgroundColor: color,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     );
   }
 }
