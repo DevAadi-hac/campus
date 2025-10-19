@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'dart:math';
@@ -429,6 +431,11 @@ class _PostRideState extends State<PostRide> {
                             onTap: _onMapTap,
                             myLocationEnabled: true,
                             myLocationButtonEnabled: true,
+                            gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                              Factory<OneSequenceGestureRecognizer>(
+                                () => EagerGestureRecognizer(),
+                              ),
+                            },
                           ),
                         ),
                       ),
