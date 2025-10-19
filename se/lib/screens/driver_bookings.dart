@@ -93,7 +93,8 @@ class DriverBookings extends StatelessWidget {
                               onPressed: () {
                                 final riderId = booking['userId'];
                                 final rideIdForChat = booking['rideId'];
-                                if (riderId != null && rideIdForChat != null) {
+                                final riderContact = booking['riderContact'];
+                                if (riderId != null && rideIdForChat != null && riderContact != null) {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
@@ -101,6 +102,7 @@ class DriverBookings extends StatelessWidget {
                                         rideId: rideIdForChat,
                                         otherUserId: riderId,
                                         otherUserName: booking['riderName'] ?? 'Rider',
+                                        otherUserPhone: riderContact,
                                       ),
                                     ),
                                   );

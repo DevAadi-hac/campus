@@ -413,7 +413,13 @@ class _MyBookingsState extends State<MyBookings> {
                 alignment: WrapAlignment.end,
                 children: [
                   ElevatedButton.icon(
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ChatScreen(rideId: rideId, otherUserId: rideData['driverId'], otherUserName: 'Driver'))),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ChatScreen(
+                      rideId: rideId,
+                      otherUserId: rideData['driverId'],
+                      otherUserName: rideData['driverName'] ?? 'Driver',
+                      otherUserPhone: rideData['driverContact'] ?? '',
+                      otherUserPhotoUrl: rideData['driverPhoto'],
+                    ))),
                     icon: const Icon(Icons.chat, size: 18),
                     label: const Text('Chat'),
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),

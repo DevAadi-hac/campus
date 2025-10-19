@@ -92,11 +92,17 @@ class _PassengerDetailsScreenState extends State<PassengerDetailsScreen> {
             'fare': FieldValue.increment(totalFare),
           });
         } else {
+          final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+          final riderName = userDoc.data()?['displayName'] ?? 'Rider';
+          final riderContact = user.phoneNumber;
+
           // Create new booking
           final bookingData = {
             'rideId': widget.ride['id'],
             'driverId': widget.ride['driverId'],
             'userId': user.uid,
+            'riderName': riderName,
+            'riderContact': riderContact,
             'from': widget.ride['from'],
             'to': widget.ride['to'],
             'date': widget.ride['date'],

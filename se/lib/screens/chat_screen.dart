@@ -1,17 +1,22 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ChatScreen extends StatefulWidget {
   final String rideId;
   final String otherUserId;
   final String otherUserName;
+  final String otherUserPhone;
+  final String? otherUserPhotoUrl;
 
   const ChatScreen({
     Key? key,
     required this.rideId,
     required this.otherUserId,
     required this.otherUserName,
+    required this.otherUserPhone,
+    this.otherUserPhotoUrl,
   }) : super(key: key);
 
   @override
@@ -28,8 +33,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
-      // It's good practice to handle the case where the user might be null,
-      // even if the UI should prevent this from happening.
       return;
     }
 
@@ -46,11 +49,40 @@ class _ChatScreenState extends State<ChatScreen> {
     _messageController.clear();
   }
 
+  Future<void> _makeCall() async {
+    final Uri launchUri = Uri(
+      scheme: 'tel',
+      path: widget.otherUserPhone,
+    );
+    if (await canLaunchUrl(launchUri)) {
+      await launchUrl(launchUri);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not make a call to ${widget.otherUserPhone}')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Chat with ${widget.otherUserName}'),
+        title: Row(
+          children: [
+            if (widget.otherUserPhotoUrl != null)
+              CircleAvatar(
+                backgroundImage: NetworkImage(widget.otherUserPhotoUrl!),
+              ),
+            const SizedBox(width: 8),
+            Text(widget.otherUserName),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.call),
+            onPressed: _makeCall,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -76,13 +108,10 @@ class _ChatScreenState extends State<ChatScreen> {
                     final message = messages[index];
                     final currentUser = FirebaseAuth.instance.currentUser;
 
-                    // Handle the case where the user is not logged in.
                     if (currentUser == null) {
                       return const SizedBox.shrink();
                     }
 
-                    // Determine if the message was sent by the current user.
-                    // We compare the 'senderId' from the message with the current user's UID.
                     final isMe = message['senderId'] == currentUser.uid;
 
                     return Align(

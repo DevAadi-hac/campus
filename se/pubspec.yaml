@@ -30,6 +30,7 @@ dependencies:
   firebase_app_check: ^0.3.2+10
   flutter_polyline_points: ^2.0.0
   http: ^1.2.1
+  url_launcher: ^6.3.0
 
 
 dev_dependencies:
