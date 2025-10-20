@@ -65,6 +65,24 @@ class _RiderHomeState extends State<RiderHome> {
     );
   }
 
+  void _removeRide(String rideId) {
+    FirebaseFirestore.instance.collection('rides').doc(rideId).delete();
+  }
+
+  bool _isRideOutdated(Map<String, dynamic> ride) {
+    final rideDate = ride['date'] as String?;
+    final rideTime = ride['time'] as String?;
+    if (rideDate == null || rideTime == null) {
+      return false;
+    }
+    try {
+      final rideDateTime = DateTime.parse('$rideDate $rideTime');
+      return rideDateTime.isBefore(DateTime.now());
+    } catch (e) {
+      return false;
+    }
+  }
+
   Widget _buildGoogleMap() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection("drivers").where("sharingLocation", isEqualTo: true).snapshots(),
@@ -175,6 +193,7 @@ class _RiderHomeState extends State<RiderHome> {
   Widget _buildRideCard(Map<String, dynamic> ride, String rideId) {
     final seatsAvailable = ride['seatsAvailable'] ?? 0;
     final driverId = ride['driverId'] as String?;
+    final isOutdated = _isRideOutdated(ride);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -228,12 +247,20 @@ class _RiderHomeState extends State<RiderHome> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text("₹${ride['fare']}", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green)),
-                ElevatedButton.icon(
-                  onPressed: () => _showSeatSelector(context, ride, rideId, seatsAvailable),
-                  icon: const Icon(Icons.check_circle_outline, size: 18),
-                  label: const Text("Book Now"),
-                  style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
-                ),
+                if (isOutdated)
+                  ElevatedButton.icon(
+                    onPressed: () => _removeRide(rideId),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    label: const Text("Remove Ride"),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+                  )
+                else
+                  ElevatedButton.icon(
+                    onPressed: () => _showSeatSelector(context, ride, rideId, seatsAvailable),
+                    icon: const Icon(Icons.check_circle_outline, size: 18),
+                    label: const Text("Book Now"),
+                    style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+                  ),
               ],
             ),
             const Divider(height: 20),
@@ -328,16 +355,18 @@ class _RiderHomeState extends State<RiderHome> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.directions_car_outlined, size: 80, color: Colors.grey[400]),
-          const SizedBox(height: 20),
-          Text("No rides available right now.", style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text("Please check back later.", style: Theme.of(context).textTheme.bodyMedium),
-        ],
+    return SingleChildScrollView(
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.directions_car_outlined, size: 80, color: Colors.grey[400]),
+            const SizedBox(height: 20),
+            Text("No rides available right now.", style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text("Please check back later.", style: Theme.of(context).textTheme.bodyMedium),
+          ],
+        ),
       ),
     );
   }

@@ -21,6 +21,24 @@ class _MyBookingsState extends State<MyBookings> {
   String? _cancelFeedback;
   bool _isCancelling = false;
 
+  void _removeBooking(String bookingId) {
+    FirebaseFirestore.instance.collection('bookings').doc(bookingId).delete();
+  }
+
+  bool _isRideOutdated(Map<String, dynamic> ride) {
+    final rideDate = ride['date'] as String?;
+    final rideTime = ride['time'] as String?;
+    if (rideDate == null || rideTime == null) {
+      return false;
+    }
+    try {
+      final rideDateTime = DateTime.parse('$rideDate $rideTime');
+      return rideDateTime.isBefore(DateTime.now());
+    } catch (e) {
+      return false;
+    }
+  }
+
   Widget _buildPassengerDetails(List<dynamic> passengers) {
     String maskAadhaar(String? aadhaar) {
       if (aadhaar != null && aadhaar.length >= 4) {
@@ -218,43 +236,7 @@ class _MyBookingsState extends State<MyBookings> {
     }
   }
 
-  Future<void> _deleteBooking(String bookingId) async {
-    final bool? confirmDelete = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Booking'),
-        content: const Text('Are you sure you want to delete this booking history? This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
 
-    if (confirmDelete == true) {
-      try {
-        await FirebaseFirestore.instance.collection('bookings').doc(bookingId).delete();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Booking deleted successfully'), backgroundColor: Colors.green),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error deleting booking: $e')),
-          );
-        }
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -323,7 +305,7 @@ class _MyBookingsState extends State<MyBookings> {
                         case 'completed':
                           return _buildCompletedBookingCard(currentUserBookingId, currentUserBookingData, rideData);
                         case 'cancelled':
-                          return _buildCancelledBookingCard(currentUserBookingData, rideData);
+                          return _buildCancelledBookingCard(currentUserBookingId, currentUserBookingData, rideData);
                         default:
                           return _buildActiveBookingCard(currentUserBookingId, currentUserBookingData, rideData, rideId);
                       }
@@ -348,6 +330,7 @@ class _MyBookingsState extends State<MyBookings> {
   Widget _buildActiveBookingCard(String bookingId, Map<String, dynamic> bookingData, Map<String, dynamic> rideData, String rideId) {
     final seatsAvailable = rideData['seatsAvailable'] ?? 0;
     final isConfirmed = bookingData['status'] == 'confirmed';
+    final isOutdated = _isRideOutdated(rideData);
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8.0),
@@ -412,30 +395,39 @@ class _MyBookingsState extends State<MyBookings> {
                 runSpacing: 4.0,
                 alignment: WrapAlignment.end,
                 children: [
-                  ElevatedButton.icon(
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ChatScreen(
-                      rideId: rideId,
-                      otherUserId: rideData['driverId'],
-                      otherUserName: rideData['driverName'] ?? 'Driver',
-                      otherUserPhone: rideData['driverContact'] ?? '',
-                      otherUserPhotoUrl: rideData['driverPhoto'],
-                    ))),
-                    icon: const Icon(Icons.chat, size: 18),
-                    label: const Text('Chat'),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => RideSimulationScreen(from: rideData['from'], to: rideData['to'], rideId: rideId, driverId: rideData['driverId'], bookingId: bookingId))),
-                    icon: const Icon(Icons.play_arrow, size: 18),
-                    label: const Text('Simulate'),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () => _cancelBooking(bookingId, bookingData),
-                    icon: const Icon(Icons.cancel, size: 18),
-                    label: const Text('Cancel'),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                  ),
+                  if (isOutdated)
+                    ElevatedButton.icon(
+                      onPressed: () => _removeBooking(bookingId),
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      label: const Text("Remove"),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+                    )
+                  else ...[
+                    ElevatedButton.icon(
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ChatScreen(
+                        rideId: rideId,
+                        otherUserId: rideData['driverId'],
+                        otherUserName: rideData['driverName'] ?? 'Driver',
+                        otherUserPhone: rideData['driverContact'] ?? '',
+                        otherUserPhotoUrl: rideData['driverPhoto'],
+                      ))),
+                      icon: const Icon(Icons.chat, size: 18),
+                      label: const Text('Chat'),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => RideSimulationScreen(from: rideData['from'], to: rideData['to'], rideId: rideId, driverId: rideData['driverId'], bookingId: bookingId))),
+                      icon: const Icon(Icons.play_arrow, size: 18),
+                      label: const Text('Simulate'),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => _cancelBooking(bookingId, bookingData),
+                      icon: const Icon(Icons.cancel, size: 18),
+                      label: const Text('Cancel'),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                    ),
+                  ]
                 ],
               ),
             ),
@@ -496,10 +488,11 @@ class _MyBookingsState extends State<MyBookings> {
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerRight,
-              child: IconButton(
-                icon: Icon(Icons.delete_outline, color: Colors.red[300]),
-                tooltip: 'Delete Booking',
-                onPressed: () => _deleteBooking(bookingId),
+              child: ElevatedButton.icon(
+                onPressed: () => _removeBooking(bookingId),
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: const Text("Remove"),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
               ),
             ),
           ],
@@ -508,7 +501,7 @@ class _MyBookingsState extends State<MyBookings> {
     );
   }
 
-  Widget _buildCancelledBookingCard(Map<String, dynamic> bookingData, Map<String, dynamic> rideData) {
+  Widget _buildCancelledBookingCard(String bookingId, Map<String, dynamic> bookingData, Map<String, dynamic> rideData) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8.0),
       elevation: 2,
@@ -547,6 +540,16 @@ class _MyBookingsState extends State<MyBookings> {
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: ElevatedButton.icon(
+                onPressed: () => _removeBooking(bookingId),
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: const Text("Remove"),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
               ),
             ),
           ],
