@@ -10,14 +10,32 @@ import 'rider_home.dart';
 import 'my_bookings.dart';
 import 'driver_bookings.dart';
 
-class DriverHome extends StatefulWidget {
+class DriverHome extends StatelessWidget {
   const DriverHome({super.key});
 
   @override
-  State<DriverHome> createState() => _DriverHomeState();
+  Widget build(BuildContext context) {
+    return Consumer<AuthService>(
+      builder: (context, auth, child) {
+        final user = auth.user;
+        if (user == null) {
+          return const Scaffold(body: Center(child: Text("Not logged in.")));
+        }
+        return _DriverHomeView(auth: auth);
+      },
+    );
+  }
 }
 
-class _DriverHomeState extends State<DriverHome> {
+class _DriverHomeView extends StatefulWidget {
+  final AuthService auth;
+  const _DriverHomeView({required this.auth});
+
+  @override
+  State<_DriverHomeView> createState() => _DriverHomeViewState();
+}
+
+class _DriverHomeViewState extends State<_DriverHomeView> {
   bool _sharingLocation = false;
   final Location _location = Location();
 
@@ -28,9 +46,8 @@ class _DriverHomeState extends State<DriverHome> {
   }
 
   void _checkInitialLocationSharing() async {
-    final auth = Provider.of<AuthService>(context, listen: false);
-    if (auth.user == null) return;
-    final doc = await FirebaseFirestore.instance.collection("drivers").doc(auth.user!.uid).get();
+    if (widget.auth.user == null) return;
+    final doc = await FirebaseFirestore.instance.collection("drivers").doc(widget.auth.user!.uid).get();
     if (doc.exists && doc.data()!.containsKey('sharingLocation')) {
       if (mounted) {
         setState(() {
@@ -40,14 +57,15 @@ class _DriverHomeState extends State<DriverHome> {
     }
   }
 
-  Future<void> _toggleLocationSharing(bool share, String uid) async {
+  Future<void> _toggleLocationSharing(bool share) async {
+    final uid = widget.auth.user!.uid;
     if (share) {
       final permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         final requestedPermission = await Geolocator.requestPermission();
         if (requestedPermission == LocationPermission.denied || requestedPermission == LocationPermission.deniedForever) {
           _showPermissionDialog();
-          return; // Don't enable sharing if permission is denied
+          return;
         }
       }
       _startLocationUpdates(uid);
@@ -98,12 +116,7 @@ class _DriverHomeState extends State<DriverHome> {
 
   @override
   Widget build(BuildContext context) {
-    final auth = Provider.of<AuthService>(context);
-    final user = auth.user;
-
-    if (user == null) {
-      return const Scaffold(body: Center(child: Text("Not logged in.")));
-    }
+    final user = widget.auth.user!;
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -111,19 +124,19 @@ class _DriverHomeState extends State<DriverHome> {
         title: const Text("Driver Dashboard"),
         elevation: 0,
       ),
-      drawer: _buildDrawer(auth),
+      drawer: _buildDrawer(widget.auth),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeader(auth),
+            _buildHeader(widget.auth),
             const SizedBox(height: 24),
             _buildStatsGrid(user.uid),
             const SizedBox(height: 24),
             _buildActionsGrid(context),
             const SizedBox(height: 24),
-            _buildLocationSharingCard(user.uid),
+            _buildLocationSharingCard(),
             const SizedBox(height: 24),
             const Text("Recent Feedback", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
@@ -257,13 +270,13 @@ class _DriverHomeState extends State<DriverHome> {
     );
   }
 
-  Widget _buildLocationSharingCard(String uid) {
+  Widget _buildLocationSharingCard() {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: SwitchListTile(
         value: _sharingLocation,
-        onChanged: (val) => _toggleLocationSharing(val, uid),
+        onChanged: _toggleLocationSharing,
         title: const Text("Share Live Location", style: TextStyle(fontWeight: FontWeight.w600)),
         subtitle: const Text("Allow riders to see your real-time location on the map."),
         secondary: Icon(Icons.location_on, color: _sharingLocation ? Colors.blue : Colors.grey, size: 32),

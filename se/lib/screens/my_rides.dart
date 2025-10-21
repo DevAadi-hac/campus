@@ -77,7 +77,7 @@ class _MyRidesState extends State<MyRides> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text("My Posted Rides")),
+      appBar: AppBar(title: const Text("My Posted Rides"), leading: const BackButton()),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection("rides")

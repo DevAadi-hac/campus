@@ -19,7 +19,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
         .collection("drivers")
         .doc(widget.driverId)
         .collection("ratings")
-        .add({"rating": _rating, "createdAt": FieldValue.serverTimestamp()});
+        .add({"rating": _rating, "feedback": _feedbackController.text, "createdAt": FieldValue.serverTimestamp()});
 
     await FirebaseFirestore.instance.collection('bookings').doc(widget.bookingId).update({
       'status': 'completed',

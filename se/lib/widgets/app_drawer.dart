@@ -36,12 +36,6 @@ class AppDrawer extends StatelessWidget {
               context, MaterialPageRoute(builder: (_) => const RiderHome())),
           ),
           ListTile(
-            leading: const Icon(Icons.history),
-            title: const Text("My Rides"),
-            onTap: () => Navigator.pushReplacement(
-              context, MaterialPageRoute(builder: (_) => const MyRides())),
-          ),
-          ListTile(
             leading: const Icon(Icons.bookmark),
             title: const Text("My Bookings"),
             onTap: () {
