@@ -248,11 +248,30 @@ class _RiderHomeState extends State<RiderHome> {
               children: [
                 Text("₹${ride['fare']}", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green)),
                 if (isOutdated)
-                  ElevatedButton.icon(
-                    onPressed: () => _removeRide(rideId),
-                    icon: const Icon(Icons.delete_outline, size: 18),
-                    label: const Text("Remove Ride"),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Chip(
+                        label: Text("Expired"),
+                        backgroundColor: Colors.grey,
+                      ),
+                      SizedBox(
+                        height: 28, // To make it smaller
+                        child: TextButton.icon(
+                          onPressed: () => _removeRide(rideId),
+                          icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                          label: const Text("Remove", style: TextStyle(color: Colors.red, fontSize: 12)),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else if (driverId != null && driverId == FirebaseAuth.instance.currentUser?.uid)
+                  const Chip(
+                    label: Text("Your Ride"),
+                    backgroundColor: Colors.orange,
                   )
                 else
                   ElevatedButton.icon(
