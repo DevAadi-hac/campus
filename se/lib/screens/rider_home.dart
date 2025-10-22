@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import '../widgets/app_drawer.dart';
+import '../widgets/ride_search_card.dart';
 import 'package:campus_ride_sharing_step1/screens/payment_page.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -166,17 +167,31 @@ class _RiderHomeState extends State<RiderHome> {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
                     }
-                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                      return _buildEmptyState();
+
+                    final docs = snapshot.data?.docs ?? [];
+
+                    // Always show the search card as the first scrollable item so it won't overflow the sheet.
+                    if (docs.isEmpty) {
+                      return ListView(
+                        controller: scrollController,
+                        padding: const EdgeInsets.all(8.0),
+                        children: [
+                          const Padding(padding: EdgeInsets.symmetric(horizontal: 8.0), child: RideSearchCard()),
+                          const SizedBox(height: 8),
+                          _buildEmptyState(),
+                        ],
+                      );
                     }
-                    final docs = snapshot.data!.docs;
+
                     return ListView.builder(
                       controller: scrollController,
                       padding: const EdgeInsets.all(8.0),
-                      itemCount: docs.length,
+                      itemCount: docs.length + 1, // +1 for the search card
                       itemBuilder: (c, i) {
-                        final ride = docs[i].data() as Map<String, dynamic>;
-                        final rideId = docs[i].id;
+                        if (i == 0) return const Padding(padding: EdgeInsets.symmetric(horizontal: 8.0), child: RideSearchCard());
+                        final idx = i - 1;
+                        final ride = docs[idx].data() as Map<String, dynamic>;
+                        final rideId = docs[idx].id;
                         return _buildRideCard(ride, rideId);
                       },
                     );
@@ -195,106 +210,14 @@ class _RiderHomeState extends State<RiderHome> {
     final driverId = ride['driverId'] as String?;
     final isOutdated = _isRideOutdated(ride);
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: (ride['vehiclePhoto'] != null && ride['vehiclePhoto'].toString().isNotEmpty)
-                  ? CircleAvatar(backgroundImage: NetworkImage(ride['vehiclePhoto']))
-                  : const CircleAvatar(child: Icon(Icons.directions_car, color: Colors.white)),
-              title: Text("${ride['from'] ?? 'Unknown'} → ${ride['to'] ?? 'Unknown'}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              subtitle: (driverId == null || driverId.isEmpty)
-                  ? const Text("Driver not specified", style: TextStyle(color: Colors.red))
-                  : FutureBuilder<DocumentSnapshot>(
-                      future: FirebaseFirestore.instance.collection('drivers').doc(driverId).get(),
-                      builder: (context, snapshot) {
-                        if (snapshot.hasError) {
-                          return const Text('Error loading driver', style: TextStyle(color: Colors.red));
-                        }
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Text('Driver: loading...');
-                        }
-                        if (!snapshot.hasData || !snapshot.data!.exists) {
-                          return const Text('Driver not found', style: TextStyle(color: Colors.red));
-                        }
-                        final driverData = snapshot.data!.data() as Map<String, dynamic>?;
-                        final driverName = driverData?['displayName'] ?? 'Driver';
-                        final avgRating = driverData?['averageRating'] as double? ?? 0.0;
-                        return Text('$driverName (⭐ ${avgRating.toStringAsFixed(1)})');
-                      },
-                    ),
-            ),
-            const Divider(),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: Wrap(
-                spacing: 8.0,
-                runSpacing: 4.0,
-                children: [
-                  _buildInfoChip(Icons.calendar_today, "${ride['date']} at ${ride['time']}"),
-                  _buildInfoChip(Icons.airline_seat_recline_normal, '$seatsAvailable Seats Left', color: Colors.green),
-                ],
-              ),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("₹${ride['fare']}", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green)),
-                if (isOutdated)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      const Chip(
-                        label: Text("Expired"),
-                        backgroundColor: Colors.grey,
-                      ),
-                      SizedBox(
-                        height: 28, // To make it smaller
-                        child: TextButton.icon(
-                          onPressed: () => _removeRide(rideId),
-                          icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
-                          label: const Text("Remove", style: TextStyle(color: Colors.red, fontSize: 12)),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                else if (driverId != null && driverId == FirebaseAuth.instance.currentUser?.uid)
-                  const Chip(
-                    label: Text("Your Ride"),
-                    backgroundColor: Colors.orange,
-                  )
-                else
-                  ElevatedButton.icon(
-                    onPressed: () => _showSeatSelector(context, ride, rideId, seatsAvailable),
-                    icon: const Icon(Icons.check_circle_outline, size: 18),
-                    label: const Text("Book Now"),
-                    style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
-                  ),
-              ],
-            ),
-            const Divider(height: 20),
-            ExpansionTile(
-              title: const Text('More Info', style: TextStyle(fontWeight: FontWeight.w600)),
-              tilePadding: EdgeInsets.zero,
-              children: [
-                _buildDetailRow(Icons.person_outline, 'Driver Contact', ride['driverContact'] ?? 'N/A'),
-                _buildDetailRow(Icons.car_rental_outlined, 'Vehicle', "${ride['vehicleName'] ?? 'N/A'} (${ride['vehicleType'] ?? 'N/A'})"),
-                _buildDetailRow(Icons.pin_outlined, 'Vehicle Number', ride['vehicleRegNo'] ?? 'N/A'),
-              ],
-            )
-          ],
-        ),
-      ),
+    return _SimpleExpandableRideCard(
+      ride: ride,
+      rideId: rideId,
+      seatsAvailable: seatsAvailable,
+      driverId: driverId,
+      isOutdated: isOutdated,
+      onRemoveRide: _removeRide,
+      onShowSeatSelector: _showSeatSelector,
     );
   }
 
@@ -309,6 +232,14 @@ class _RiderHomeState extends State<RiderHome> {
           Expanded(child: Text(value, textAlign: TextAlign.end)),
         ],
       ),
+    );
+  }
+
+  Widget _buildInfoChip(IconData icon, String text, {Color? color}) {
+    return Chip(
+      avatar: Icon(icon, size: 16, color: color ?? Colors.grey[700]),
+      label: Text(text, style: TextStyle(fontSize: 12, color: color ?? Colors.grey[700])),
+      backgroundColor: (color ?? Colors.grey[700])!.withOpacity(0.1),
     );
   }
 
@@ -364,15 +295,6 @@ class _RiderHomeState extends State<RiderHome> {
     );
   }
 
-  Widget _buildInfoChip(IconData icon, String text, {Color? color}) {
-    return Chip(
-      avatar: Icon(icon, size: 16, color: color ?? Colors.grey[600]),
-      label: Text(text, style: TextStyle(color: color ?? Colors.grey[700])),
-      backgroundColor: color?.withOpacity(0.1) ?? Colors.grey[200],
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    );
-  }
-
   Widget _buildEmptyState() {
     return SingleChildScrollView(
       child: Center(
@@ -387,6 +309,211 @@ class _RiderHomeState extends State<RiderHome> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SimpleExpandableRideCard extends StatefulWidget {
+  final Map<String, dynamic> ride;
+  final String rideId;
+  final int seatsAvailable;
+  final String? driverId;
+  final bool isOutdated;
+  final Function(String) onRemoveRide;
+  final Function(BuildContext, Map<String, dynamic>, String, int) onShowSeatSelector;
+
+  const _SimpleExpandableRideCard({
+    required this.ride,
+    required this.rideId,
+    required this.seatsAvailable,
+    required this.driverId,
+    required this.isOutdated,
+    required this.onRemoveRide,
+    required this.onShowSeatSelector,
+  });
+
+  @override
+  State<_SimpleExpandableRideCard> createState() => _SimpleExpandableRideCardState();
+}
+
+class _SimpleExpandableRideCardState extends State<_SimpleExpandableRideCard> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Basic ride info
+            ListTile(
+              leading: (widget.ride['vehiclePhoto'] != null && widget.ride['vehiclePhoto'].toString().isNotEmpty)
+                  ? CircleAvatar(backgroundImage: NetworkImage(widget.ride['vehiclePhoto']))
+                  : const CircleAvatar(child: Icon(Icons.directions_car, color: Colors.white)),
+              title: Text("${widget.ride['from'] ?? 'Unknown'} → ${widget.ride['to'] ?? 'Unknown'}", 
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              subtitle: (widget.driverId == null || widget.driverId!.isEmpty)
+                  ? const Text("Driver not specified", style: TextStyle(color: Colors.red))
+                  : FutureBuilder<DocumentSnapshot>(
+                      future: FirebaseFirestore.instance.collection('drivers').doc(widget.driverId).get(),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return const Text('Error loading driver', style: TextStyle(color: Colors.red));
+                        }
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Text('Driver: loading...');
+                        }
+                        if (!snapshot.hasData || !snapshot.data!.exists) {
+                          return const Text('Driver not found', style: TextStyle(color: Colors.red));
+                        }
+                        final driverData = snapshot.data!.data() as Map<String, dynamic>?;
+                        final driverName = driverData?['displayName'] ?? 'Driver';
+                        final avgRating = driverData?['averageRating'] as double? ?? 0.0;
+                        return Text('$driverName (⭐ ${avgRating.toStringAsFixed(1)})');
+                      },
+                    ),
+            ),
+            const Divider(),
+            
+            // Date, time, and seats info
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Wrap(
+                spacing: 8.0,
+                runSpacing: 4.0,
+                children: [
+                  _buildInfoChip(Icons.calendar_today, "${widget.ride['date']} at ${widget.ride['time']}"),
+                  _buildInfoChip(Icons.airline_seat_recline_normal, '${widget.seatsAvailable} Seats Left', color: Colors.green),
+                ],
+              ),
+            ),
+            
+            // Price and action buttons (responsive to avoid overflow)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Flexible(
+                  child: Text(
+                    "₹${widget.ride['fare']}",
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      // View Details button
+                      TextButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _isExpanded = !_isExpanded;
+                          });
+                        },
+                        icon: Icon(_isExpanded ? Icons.expand_less : Icons.expand_more),
+                        label: Text(_isExpanded ? 'Hide' : 'View'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Theme.of(context).primaryColor,
+                        ),
+                      ),
+                      if (widget.isOutdated) ...[
+                        const Chip(
+                          label: Text("Expired"),
+                          backgroundColor: Colors.grey,
+                        ),
+                        SizedBox(
+                          height: 28,
+                          child: TextButton.icon(
+                            onPressed: () => widget.onRemoveRide(widget.rideId),
+                            icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                            label: const Text("Remove", style: TextStyle(color: Colors.red, fontSize: 12)),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                            ),
+                          ),
+                        ),
+                      ] else if (widget.driverId != null && widget.driverId == FirebaseAuth.instance.currentUser?.uid) ...[
+                        const Chip(
+                          label: Text("Your Ride"),
+                          backgroundColor: Colors.orange,
+                        ),
+                      ] else ...[
+                        ElevatedButton.icon(
+                          onPressed: () => widget.onShowSeatSelector(context, widget.ride, widget.rideId, widget.seatsAvailable),
+                          icon: const Icon(Icons.check_circle_outline, size: 18),
+                          label: const Text("Book Now"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(context).primaryColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            
+            // Expanded details section - only show actual posted fields
+            if (_isExpanded) ...[
+              const Divider(height: 20),
+              _buildExpandedDetails(),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpandedDetails() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Ride Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        
+        // Only show fields that are actually posted in the ride
+        _buildDetailRow(Icons.person_outline, 'Driver Contact', widget.ride['driverContact'] ?? 'N/A'),
+        _buildDetailRow(Icons.directions_car, 'Vehicle', "${widget.ride['vehicleName'] ?? 'N/A'} (${widget.ride['vehicleType'] ?? 'N/A'})"),
+        _buildDetailRow(Icons.confirmation_number, 'Vehicle Number', widget.ride['vehicleRegNo'] ?? 'N/A'),
+        _buildDetailRow(Icons.access_time, 'Departure Time', "${widget.ride['date']} at ${widget.ride['time']}"),
+        _buildDetailRow(Icons.people, 'Available Seats', '${widget.seatsAvailable}'),
+        _buildDetailRow(Icons.attach_money, 'Fare per Person', '₹${widget.ride['fare']}'),
+        if (widget.ride['costPerKm'] != null)
+          _buildDetailRow(Icons.speed, 'Cost per KM', '₹${widget.ride['costPerKm']}'),
+      ],
+    );
+  }
+
+  Widget _buildDetailRow(IconData icon, String title, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: Colors.grey[700]),
+          const SizedBox(width: 12),
+          Text('$title: ', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Expanded(child: Text(value, textAlign: TextAlign.end)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoChip(IconData icon, String text, {Color? color}) {
+    return Chip(
+      avatar: Icon(icon, size: 16, color: color ?? Colors.grey[700]),
+      label: Text(text, style: TextStyle(fontSize: 12, color: color ?? Colors.grey[700])),
+      backgroundColor: (color ?? Colors.grey[700])!.withOpacity(0.1),
     );
   }
 }

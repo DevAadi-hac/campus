@@ -12,6 +12,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/notification_service.dart';
+import '../services/distance_service.dart' hide LatLng;
 
 class PostRide extends StatefulWidget {
   const PostRide({super.key});
@@ -55,19 +56,7 @@ class _PostRideState extends State<PostRide> {
     timeC.text = DateFormat('HH:mm').format(now);
   }
 
-  double _calculateDistanceKm(LatLng a, LatLng b) {
-    const double R = 6371;
-    double dLat = (b.latitude - a.latitude) * pi / 180.0;
-    double dLon = (b.longitude - a.longitude) * pi / 180.0;
-    double lat1 = a.latitude * pi / 180.0;
-    double lat2 = b.latitude * pi / 180.0;
-    double aVal = (sin(dLat / 2) * sin(dLat / 2)) +
-        (sin(dLon / 2) * sin(dLon / 2)) * cos(lat1) * cos(lat2);
-    double c = 2 * atan2(sqrt(aVal), sqrt(1 - aVal));
-    return R * c;
-  }
-
-  void _updateFare() {
+  void _updateFare() async {
     double? costPerKm = double.tryParse(costPerKmC.text);
     if (costPerKmC.text.isEmpty) {
       setState(() => costPerKmError = null);
@@ -80,8 +69,14 @@ class _PostRideState extends State<PostRide> {
         _toLatLng != null &&
         costPerKm != null &&
         costPerKmError == null) {
-      double dist = _calculateDistanceKm(_fromLatLng!, _toLatLng!);
-      fareC.text = (dist * costPerKm).toStringAsFixed(2);
+      String distanceStr = await DistanceService.calculateRoadDistanceFromCoords(
+          _fromLatLng!.latitude, _fromLatLng!.longitude, _toLatLng!.latitude, _toLatLng!.longitude);
+      if (distanceStr != 'N/A') {
+        double dist = double.parse(distanceStr.replaceAll(' km', ''));
+        fareC.text = (dist * costPerKm).toStringAsFixed(2);
+      } else {
+        fareC.text = 'Error';
+      }
     } else {
       fareC.text = '';
     }

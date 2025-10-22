@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/passenger_model.dart';
+import '../services/notification_service.dart';
 import 'my_bookings.dart';
 
 class PassengerDetailsScreen extends StatefulWidget {
@@ -119,6 +120,19 @@ class _PassengerDetailsScreenState extends State<PassengerDetailsScreen> {
         await FirebaseFirestore.instance.collection('rides').doc(widget.ride['id']).update({
           'seatsAvailable': FieldValue.increment(-widget.numberOfSeats),
         });
+
+        // Send booking success notification
+        await NotificationService.sendRideNotification(
+          userId: user.uid,
+          type: 'ride_booked',
+          rideData: {
+            'from': widget.ride['from'],
+            'to': widget.ride['to'],
+            'fare': totalFare,
+            'date': widget.ride['date'],
+            'time': widget.ride['time'],
+          },
+        );
 
         Navigator.pop(context, true);
       } catch (e) {

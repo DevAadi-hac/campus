@@ -2,9 +2,12 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import '../services/notification_service.dart';
 import '../services/ride_service.dart';
+import '../services/distance_service.dart';
 import '../widgets/rating_submission_form.dart';
 import 'chat_screen.dart';
 import 'ride_simulation_screen.dart';
@@ -236,7 +239,15 @@ class _MyBookingsState extends State<MyBookings> {
     }
   }
 
-
+  Future<String> _calculateRideDistance(String from, String to) async {
+    try {
+      // Use the new DistanceService for real road distance calculation
+      return await DistanceService.calculateRoadDistance(from, to);
+    } catch (e) {
+      print('Error calculating road distance: $e');
+      return 'N/A';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -367,6 +378,15 @@ class _MyBookingsState extends State<MyBookings> {
                 const Divider(),
                 _buildInfoRow(Icons.calendar_today, '${rideData['date']} at ${rideData['time']}'),
                 _buildInfoRow(Icons.currency_rupee, '${bookingData['fare']}'),
+                FutureBuilder<String>(
+                  future: _calculateRideDistance(rideData['from'] ?? '', rideData['to'] ?? ''),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return _buildInfoRow(Icons.route_outlined, 'Distance: ...');
+                    }
+                    return _buildInfoRow(Icons.route_outlined, 'Distance: ${snapshot.data ?? 'N/A'}');
+                  },
+                ),
                 _buildInfoRow(
                   Icons.airline_seat_recline_normal,
                   seatsAvailable > 0 ? 'Seats Available: $seatsAvailable' : 'Ride is Full',

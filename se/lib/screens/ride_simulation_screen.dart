@@ -13,6 +13,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'payment_page.dart';
 import 'package:campus_ride_sharing_step1/services/api_key.dart';
+import 'package:campus_ride_sharing_step1/services/distance_service.dart' hide LatLng;
 
 class NavigationStep {
   final String instruction;
@@ -74,6 +75,7 @@ class _RideSimulationScreenState extends State<RideSimulationScreen> {
 
   double _speed = 0.0;
   String _eta = '';
+  String _remainingDistance = 'N/A';
   String _driverName = 'Loading...';
   String _vehicleInfo = 'Loading...';
   String _vehiclePhotoUrl = '';
@@ -338,6 +340,7 @@ class _RideSimulationScreenState extends State<RideSimulationScreen> {
       _speed = position.speed * 3.6;
 
       final distance = _calculateDistance(newPosition, _endPoint!);
+      _remainingDistance = '${distance.toStringAsFixed(2)} km';
       if (_speed > 0) {
         final time = distance / (_speed / 3600);
         _eta = '${Duration(seconds: time.toInt()).inMinutes} min';
@@ -612,6 +615,7 @@ class _RideSimulationScreenState extends State<RideSimulationScreen> {
       children: [
         _buildStatItem(Icons.speed, "Speed", '${_speed.toStringAsFixed(1)} km/h'),
         _buildStatItem(Icons.timer, "ETA", _eta),
+        _buildStatItem(Icons.route_outlined, "Distance", _remainingDistance),
         _buildStatItem(Icons.schedule, "Arrival", _calculateArrivalTime()),
       ],
     );
