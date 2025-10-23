@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'chat_screen.dart';
+import 'live_location_screen.dart';
 
 class DriverBookings extends StatelessWidget {
   const DriverBookings({super.key});
@@ -85,10 +86,35 @@ class DriverBookings extends StatelessWidget {
                         Text('Rider Contact: ${booking['riderContact']}', style: const TextStyle(fontSize: 14)),
                       
                       const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
+                      Wrap(
+                        spacing: 8.0,
+                        runSpacing: 4.0,
+                        alignment: WrapAlignment.end,
                         children: [
-                          if (isConfirmed)
+                          if (isConfirmed) ...[
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                final rideId = booking['rideId'];
+                                if (rideId != null) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => LiveLocationScreen(rideId: rideId),
+                                    ),
+                                  );
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Could not open map. Ride information is missing.')),
+                                  );
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.teal,
+                                foregroundColor: Colors.white,
+                              ),
+                              icon: const Icon(Icons.map, size: 18),
+                              label: const Text('View on Map'),
+                            ),
                             ElevatedButton.icon(
                               onPressed: () {
                                 final riderId = booking['userId'];
@@ -119,6 +145,7 @@ class DriverBookings extends StatelessWidget {
                               icon: const Icon(Icons.chat, size: 18),
                               label: const Text('Chat with Rider'),
                             ),
+                          ]
                         ],
                       ),
                     ],

@@ -12,6 +12,7 @@ import '../widgets/rating_submission_form.dart';
 import 'chat_screen.dart';
 import 'ride_simulation_screen.dart';
 import 'feedback_page.dart';
+import 'live_location_screen.dart';
 
 class MyBookings extends StatefulWidget {
   const MyBookings({super.key});
@@ -373,7 +374,12 @@ class _MyBookingsState extends State<MyBookings> {
                     '${rideData['from'] ?? ''} → ${rideData['to'] ?? ''}',
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                   ),
-                  trailing: _buildStatusChip(bookingData['status']),
+                  trailing: isOutdated
+                      ? const Chip(
+                          label: Text('OUTDATED'),
+                          backgroundColor: Colors.grey,
+                        )
+                      : _buildStatusChip(bookingData['status']),
                 ),
                 const Divider(),
                 _buildInfoRow(Icons.calendar_today, '${rideData['date']} at ${rideData['time']}'),
@@ -411,7 +417,7 @@ class _MyBookingsState extends State<MyBookings> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Wrap(
-                spacing: 8.0,
+                spacing: 4.0,
                 runSpacing: 4.0,
                 alignment: WrapAlignment.end,
                 children: [
@@ -419,10 +425,16 @@ class _MyBookingsState extends State<MyBookings> {
                     ElevatedButton.icon(
                       onPressed: () => _removeBooking(bookingId),
                       icon: const Icon(Icons.delete_outline, size: 18),
-                      label: const Text("Remove"),
+                      label: const Text("Delete"),
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
                     )
                   else ...[
+                    ElevatedButton.icon(
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => LiveLocationScreen(rideId: rideId))),
+                      icon: const Icon(Icons.map, size: 18),
+                      label: const Text('View on Map'),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+                    ),
                     ElevatedButton.icon(
                       onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ChatScreen(
                         rideId: rideId,
@@ -511,7 +523,7 @@ class _MyBookingsState extends State<MyBookings> {
               child: ElevatedButton.icon(
                 onPressed: () => _removeBooking(bookingId),
                 icon: const Icon(Icons.delete_outline, size: 18),
-                label: const Text("Remove"),
+                label: const Text("Delete"),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
               ),
             ),
@@ -568,7 +580,7 @@ class _MyBookingsState extends State<MyBookings> {
               child: ElevatedButton.icon(
                 onPressed: () => _removeBooking(bookingId),
                 icon: const Icon(Icons.delete_outline, size: 18),
-                label: const Text("Remove"),
+                label: const Text("Delete"),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
               ),
             ),

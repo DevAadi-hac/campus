@@ -6,6 +6,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:geocoding/geocoding.dart';
 import 'my_rides.dart';
 import 'my_bookings.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -243,35 +244,43 @@ class _PostRideState extends State<PostRide> {
     }
   }
 
-  void _onMapTap(LatLng pos) {
-    setState(() {
-      if (selectingPickup) {
-        _fromLatLng = pos;
-        fromC.text =
-            '(${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)})';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'Pickup location set at ${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      } else {
-        _toLatLng = pos;
-        toC.text =
-            '(${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)})';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'Drop location set at ${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+  void _onMapTap(LatLng pos) async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
+      if (placemarks.isNotEmpty) {
+        final placemark = placemarks.first;
+        final address = [placemark.name, placemark.locality, placemark.administrativeArea, placemark.country].where((part) => part != null && part.isNotEmpty).join(', ');
+
+        setState(() {
+          if (selectingPickup) {
+            _fromLatLng = pos;
+            fromC.text = address;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Pickup location set: $address'),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          } else {
+            _toLatLng = pos;
+            toC.text = address;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Drop location set: $address'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+          _updateFare();
+        });
       }
-      _updateFare();
-    });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to get address: $e')),
+      );
+    }
   }
 
   Future<void> _pickDate() async {

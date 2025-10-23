@@ -14,6 +14,7 @@ import 'package:campus_ride_sharing_step1/services/api_key.dart';
 import 'package:campus_ride_sharing_step1/screens/passenger_details_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:campus_ride_sharing_step1/services/auth_service.dart';
+import 'package:intl/intl.dart';
 
 class RiderHome extends StatefulWidget {
   const RiderHome({super.key});
@@ -77,10 +78,17 @@ class _RiderHomeState extends State<RiderHome> {
       return false;
     }
     try {
-      final rideDateTime = DateTime.parse('$rideDate $rideTime');
+      // Try parsing with 24-hour format first
+      final rideDateTime = DateFormat('yyyy-MM-dd HH:mm').parse('$rideDate $rideTime');
       return rideDateTime.isBefore(DateTime.now());
     } catch (e) {
-      return false;
+      try {
+        // If that fails, try parsing with 12-hour AM/PM format
+        final rideDateTime = DateFormat('yyyy-MM-dd h:mm a').parse('$rideDate $rideTime');
+        return rideDateTime.isBefore(DateTime.now());
+      } catch (e) {
+        return false;
+      }
     }
   }
 
