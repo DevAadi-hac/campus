@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -39,7 +38,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
   StreamSubscription<LocationData>? _locationSubscription;
 
   Marker? _driverMarker;
-  Marker? _riderMarker;
+  Map<String, Marker> _riderMarkers = {};
   bool _isInitialCameraPositionSet = false;
 
   @override
@@ -58,8 +57,9 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
   void _startLocationUpdates() async {
     final authService = Provider.of<AuthService>(context, listen: false);
     final role = authService.profile?['role'];
+    final userId = authService.user?.uid;
 
-    if (role == null) return; // Or handle error
+    if (role == null || userId == null) return; // Or handle error
 
     bool serviceEnabled;
     PermissionStatus permissionGranted;
@@ -81,10 +81,15 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
     }
 
     _locationSubscription = _locationService.onLocationChanged.listen((LocationData currentLocation) {
-      final locationField = role == 'driver' ? 'driverLocation' : 'riderLocation';
-      FirebaseFirestore.instance.collection('rides').doc(widget.rideId).update({
-        locationField: GeoPoint(currentLocation.latitude!, currentLocation.longitude!),
-      });
+      if (role == 'driver') {
+        FirebaseFirestore.instance.collection('rides').doc(widget.rideId).update({
+          'driverLocation': GeoPoint(currentLocation.latitude!, currentLocation.longitude!),
+        });
+      } else {
+        FirebaseFirestore.instance.collection('rides').doc(widget.rideId).update({
+          'passengerLocations.$userId': GeoPoint(currentLocation.latitude!, currentLocation.longitude!),
+        });
+      }
     });
   }
 
@@ -95,73 +100,80 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
         
         if (data.containsKey('driverLocation')) {
           GeoPoint driverLocation = data['driverLocation'];
-          _updateMarker('driver', LatLng(driverLocation.latitude, driverLocation.longitude));
+          _updateMarker('driver', 'driver', LatLng(driverLocation.latitude, driverLocation.longitude));
         }
 
-        if (data.containsKey('riderLocation')) {
-          GeoPoint riderLocation = data['riderLocation'];
-          _updateMarker('rider', LatLng(riderLocation.latitude, riderLocation.longitude));
+        if (data.containsKey('passengerLocations')) {
+          Map<String, dynamic> passengerLocations = data['passengerLocations'];
+          int riderCount = 1;
+          passengerLocations.forEach((key, value) {
+            GeoPoint riderLocation = value;
+            _updateMarker('rider_$key', 'rider$riderCount', LatLng(riderLocation.latitude, riderLocation.longitude));
+            riderCount++;
+          });
         }
       }
     });
   }
 
-  void _updateMarker(String userType, LatLng position) async {
-    final icon = await _bitmapDescriptorFromEmoji(userType == 'driver' ? '🚗' : '🕴️');
+  void _updateMarker(String markerId, String title, LatLng position) async {
+    final icon = await _bitmapDescriptorFromEmoji(title.startsWith('driver') ? '🚗' : '🕴️');
 
     setState(() {
-      if (userType == 'driver') {
+      if (title.startsWith('driver')) {
         _driverMarker = Marker(
-          markerId: MarkerId('driver'),
+          markerId: MarkerId(markerId),
           position: position,
           icon: icon,
           infoWindow: InfoWindow(title: 'Driver'),
         );
       } else {
-        _riderMarker = Marker(
-          markerId: MarkerId('rider'),
+        _riderMarkers[markerId] = Marker(
+          markerId: MarkerId(markerId),
           position: position,
           icon: icon,
-          infoWindow: InfoWindow(title: 'Rider'),
+          infoWindow: InfoWindow(title: title),
         );
       }
     });
 
     if (!_isInitialCameraPositionSet) {
       _updateCameraPosition();
-      if (_driverMarker != null && _riderMarker != null) {
+      if (_driverMarker != null && _riderMarkers.isNotEmpty) {
         _isInitialCameraPositionSet = true;
       }
     }
   }
 
   void _updateCameraPosition() async {
-    if (_driverMarker != null && _riderMarker != null) {
-      final GoogleMapController controller = await _controller.future;
-      
+    final GoogleMapController controller = await _controller.future;
+    
+    List<Marker> allMarkers = [];
+    if(_driverMarker != null) allMarkers.add(_driverMarker!);
+    allMarkers.addAll(_riderMarkers.values);
+
+    if (allMarkers.length > 1) {
       LatLngBounds bounds = LatLngBounds(
         southwest: LatLng(
-          _driverMarker!.position.latitude < _riderMarker!.position.latitude ? _driverMarker!.position.latitude : _riderMarker!.position.latitude,
-          _driverMarker!.position.longitude < _riderMarker!.position.longitude ? _driverMarker!.position.longitude : _riderMarker!.position.longitude,
+          allMarkers.map((m) => m.position.latitude).reduce((a, b) => a < b ? a : b),
+          allMarkers.map((m) => m.position.longitude).reduce((a, b) => a < b ? a : b),
         ),
         northeast: LatLng(
-          _driverMarker!.position.latitude > _riderMarker!.position.latitude ? _driverMarker!.position.latitude : _riderMarker!.position.latitude,
-          _driverMarker!.position.longitude > _riderMarker!.position.longitude ? _driverMarker!.position.longitude : _riderMarker!.position.longitude,
+          allMarkers.map((m) => m.position.latitude).reduce((a, b) => a > b ? a : b),
+          allMarkers.map((m) => m.position.longitude).reduce((a, b) => a > b ? a : b),
         ),
       );
 
       controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 100));
-    } else if (_driverMarker != null) {
-       final GoogleMapController controller = await _controller.future;
-       controller.animateCamera(CameraUpdate.newLatLngZoom(_driverMarker!.position, 15));
-    } else if (_riderMarker != null) {
-       final GoogleMapController controller = await _controller.future;
-       controller.animateCamera(CameraUpdate.newLatLngZoom(_riderMarker!.position, 15));
+    } else if (allMarkers.length == 1) {
+       controller.animateCamera(CameraUpdate.newLatLngZoom(allMarkers.first.position, 15));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    Set<Marker> markers = {_driverMarker, ..._riderMarkers.values}.where((marker) => marker != null).toSet().cast<Marker>();
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Live Ride Location'),
@@ -175,7 +187,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
         onMapCreated: (GoogleMapController controller) {
           _controller.complete(controller);
         },
-        markers: {_driverMarker, _riderMarker}.where((marker) => marker != null).toSet().cast<Marker>(),
+        markers: markers,
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _updateCameraPosition,

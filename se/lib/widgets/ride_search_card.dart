@@ -53,8 +53,8 @@ class _RideSearchCardState extends State<RideSearchCard> {
     if (startLat != null && startLng != null && endLat != null && endLng != null) {
       final sdist = _distanceMeters(startLat.toDouble(), startLng.toDouble(), fromLat, fromLng);
       final edist = _distanceMeters(endLat.toDouble(), endLng.toDouble(), toLat, toLng);
-      if (sdist < 10000 && edist < 10000) return true;
-      if (sdist < 7000 || edist < 7000) return true;
+      if (sdist < 25000 && edist < 25000) return true;
+      if (sdist < 15000 || edist < 15000) return true;
     }
 
     // If route points exist (stored as list of maps with lat,lng)
@@ -66,7 +66,7 @@ class _RideSearchCardState extends State<RideSearchCard> {
         if (plat == null || plng == null) continue;
         final dFrom = _distanceMeters(plat.toDouble(), plng.toDouble(), fromLat, fromLng);
         final dTo = _distanceMeters(plat.toDouble(), plng.toDouble(), toLat, toLng);
-        if (dFrom < 5000 || dTo < 5000) return true;
+        if (dFrom < 10000 || dTo < 10000) return true;
       }
     }
 
@@ -255,7 +255,7 @@ class _RideSearchCardState extends State<RideSearchCard> {
               Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8.0),
                   child: Text(
-                      'No rides found. Try widening date or allow nearby matches.',
+                      'No rides found for the selected criteria. Please try a different date or location.',
                       style: TextStyle(color: Colors.grey[700]))),
             for (final r in _results)
               _SearchResultCard(
