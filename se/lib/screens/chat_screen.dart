@@ -25,9 +25,32 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
+  String? _chatRoomId;
+
+  @override
+  void initState() {
+    super.initState();
+    _generateChatRoomId();
+  }
+
+  void _generateChatRoomId() {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      // Handle not logged in case
+      return;
+    }
+    final currentUserId = currentUser.uid;
+    final otherUserId = widget.otherUserId;
+
+    // Create a consistent chat room ID regardless of who initiates the chat
+    List<String> ids = [currentUserId, otherUserId];
+    ids.sort();
+    // By including the rideId, we ensure the chat is specific to this ride
+    _chatRoomId = '${widget.rideId}_${ids[0]}_${ids[1]}';
+  }
 
   void _sendMessage() async {
-    if (_messageController.text.trim().isEmpty) {
+    if (_messageController.text.trim().isEmpty || _chatRoomId == null) {
       return;
     }
 
@@ -38,7 +61,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     await FirebaseFirestore.instance
         .collection('chats')
-        .doc(widget.rideId)
+        .doc(_chatRoomId) // Use the unique chat room ID
         .collection('messages')
         .add({
       'text': _messageController.text.trim(),
@@ -65,6 +88,15 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_chatRoomId == null) {
+      // This can happen if the user is not logged in when the screen initializes.
+      // You can show a loading indicator or an error message.
+      return Scaffold(
+        appBar: AppBar(title: Text(widget.otherUserName)),
+        body: const Center(child: Text("Error: Could not initialize chat.")),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -90,7 +122,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('chats')
-                  .doc(widget.rideId)
+                  .doc(_chatRoomId) // Use the unique chat room ID
                   .collection('messages')
                   .orderBy('timestamp', descending: true)
                   .snapshots(),

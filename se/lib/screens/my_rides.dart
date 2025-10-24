@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'chat_screen.dart'; // Make sure this import is correct
 
 class MyRides extends StatefulWidget {
   const MyRides({super.key});
@@ -161,6 +162,7 @@ class _MyRidesState extends State<MyRides> {
                         ],
                       ),
                     ),
+                    _buildPassengersList(rideId), // Widget to show passengers
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 8),
@@ -190,6 +192,72 @@ class _MyRidesState extends State<MyRides> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildPassengersList(String rideId) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('bookings')
+          .where('rideId', isEqualTo: rideId)
+          .where('status', isEqualTo: 'confirmed')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.all(8.0),
+            child: Text("No confirmed passengers yet.", textAlign: TextAlign.center),
+          );
+        }
+
+        final passengerDocs = snapshot.data!.docs;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Text("Passengers:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ),
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: passengerDocs.length,
+              itemBuilder: (context, index) {
+                final passenger = passengerDocs[index].data() as Map<String, dynamic>;
+                final passengerName = passenger['riderName'] ?? 'Unknown Rider';
+                final passengerId = passenger['userId'];
+                final passengerPhone = passenger['riderContact'] ?? '';
+
+                return ListTile(
+                  title: Text("Rider ${index + 1}: $passengerName"),
+                  trailing: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ChatScreen(
+                            rideId: rideId,
+                            otherUserId: passengerId,
+                            otherUserName: passengerName,
+                            otherUserPhone: passengerPhone,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                    label: const Text("Chat"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).primaryColor,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 }
