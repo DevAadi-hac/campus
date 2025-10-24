@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -96,6 +97,9 @@ class _PassengerDetailsScreenState extends State<PassengerDetailsScreen> {
           final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
           final riderName = userDoc.data()?['displayName'] ?? 'Rider';
           final riderContact = user.phoneNumber;
+          
+          // Generate a 6-digit OTP
+          final String otp = (100000 + Random().nextInt(900000)).toString();
 
           // Create new booking
           final bookingData = {
@@ -111,6 +115,7 @@ class _PassengerDetailsScreenState extends State<PassengerDetailsScreen> {
             'fare': totalFare,
             'passengers': passengers,
             'status': 'confirmed',
+            'otp': otp, // Add OTP to booking data
             'createdAt': FieldValue.serverTimestamp(),
           };
           await FirebaseFirestore.instance.collection('bookings').add(bookingData);

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'chat_screen.dart'; // Make sure this import is correct
+import 'ride_simulation_screen.dart';
 
 class MyRides extends StatefulWidget {
   const MyRides({super.key});
@@ -66,6 +67,52 @@ class _MyRidesState extends State<MyRides> {
       }
     }
   }
+  
+  void _showOtpDialog(BuildContext context, String rideId, String bookingId, String correctOtp, Map<String, dynamic> rideData) {
+    final otpController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Enter Rider\'s OTP'),
+        content: TextField(
+          controller: otpController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'OTP'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (otpController.text == correctOtp) {
+                await FirebaseFirestore.instance.collection('bookings').doc(bookingId).update({'status': 'started'});
+                Navigator.of(context).pop(); // Close the dialog
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => RideSimulationScreen(
+                      rideId: rideId, 
+                      from: rideData['from'], 
+                      to: rideData['to'], 
+                      driverId: FirebaseAuth.instance.currentUser!.uid, 
+                      bookingId: bookingId
+                    ),
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Incorrect OTP. Please try again.')),
+                );
+              }
+            },
+            child: const Text('Verify & Start'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -93,7 +140,7 @@ class _MyRidesState extends State<MyRides> {
           }
           final docs = snapshot.data!.docs;
           if (docs.isEmpty) {
-            return const Center(child: Text("You haven't posted any rides yet."));
+            return const Center(child: Text("You haven\'t posted any rides yet."));
           }
           return ListView.builder(
             padding: const EdgeInsets.all(8),
@@ -162,7 +209,7 @@ class _MyRidesState extends State<MyRides> {
                         ],
                       ),
                     ),
-                    _buildPassengersList(rideId), // Widget to show passengers
+                    _buildPassengersList(rideId, ride), // Widget to show passengers
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 8),
@@ -195,18 +242,17 @@ class _MyRidesState extends State<MyRides> {
     );
   }
 
-  Widget _buildPassengersList(String rideId) {
+  Widget _buildPassengersList(String rideId, Map<String, dynamic> rideData) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('bookings')
           .where('rideId', isEqualTo: rideId)
-          .where('status', isEqualTo: 'confirmed')
           .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return const Padding(
             padding: EdgeInsets.all(8.0),
-            child: Text("No confirmed passengers yet.", textAlign: TextAlign.center),
+            child: Text("No passengers yet.", textAlign: TextAlign.center),
           );
         }
 
@@ -225,32 +271,64 @@ class _MyRidesState extends State<MyRides> {
               itemCount: passengerDocs.length,
               itemBuilder: (context, index) {
                 final passenger = passengerDocs[index].data() as Map<String, dynamic>;
+                final bookingId = passengerDocs[index].id;
                 final passengerName = passenger['riderName'] ?? 'Unknown Rider';
                 final passengerId = passenger['userId'];
                 final passengerPhone = passenger['riderContact'] ?? '';
+                final bookingStatus = passenger['status'] ?? 'pending';
+                final otp = passenger['otp'] as String?;
 
                 return ListTile(
                   title: Text("Rider ${index + 1}: $passengerName"),
-                  trailing: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ChatScreen(
-                            rideId: rideId,
-                            otherUserId: passengerId,
-                            otherUserName: passengerName,
-                            otherUserPhone: passengerPhone,
-                          ),
+                  subtitle: Text('Status: $bookingStatus'),
+                  trailing: Wrap(
+                    spacing: 4,
+                    children: [
+                      if (bookingStatus == 'confirmed' && otp != null)
+                        ElevatedButton(
+                          onPressed: () => _showOtpDialog(context, rideId, bookingId, otp, rideData),
+                          child: const Text('Start Ride'),
                         ),
-                      );
-                    },
-                    icon: const Icon(Icons.chat_bubble_outline, size: 16),
-                    label: const Text("Chat"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).primaryColor,
-                      foregroundColor: Colors.white,
-                    ),
+                      if (bookingStatus == 'started')
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => RideSimulationScreen(
+                                  rideId: rideId,
+                                  from: rideData['from'],
+                                  to: rideData['to'],
+                                  driverId: FirebaseAuth.instance.currentUser!.uid,
+                                  bookingId: bookingId,
+                                ),
+                              ),
+                            );
+                          },
+                          child: const Text('View Simulation'),
+                        ),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ChatScreen(
+                                rideId: rideId,
+                                otherUserId: passengerId,
+                                otherUserName: passengerName,
+                                otherUserPhone: passengerPhone,
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                        label: const Text("Chat"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).primaryColor,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
                 );
               },

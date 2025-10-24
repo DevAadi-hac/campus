@@ -313,6 +313,24 @@ class _MyBookingsState extends State<MyBookings> {
                       }
 
                       final status = currentUserBookingData['status'] ?? 'unknown';
+
+                      if (status == 'started') {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => RideSimulationScreen(
+                                from: rideData['from'], 
+                                to: rideData['to'], 
+                                rideId: rideId, 
+                                driverId: rideData['driverId'], 
+                                bookingId: currentUserBookingId
+                              ),
+                            ),
+                          );
+                        });
+                      }
+
                       switch (status) {
                         case 'completed':
                           return _buildCompletedBookingCard(currentUserBookingId, currentUserBookingData, rideData);
@@ -384,6 +402,8 @@ class _MyBookingsState extends State<MyBookings> {
                 const Divider(),
                 _buildInfoRow(Icons.calendar_today, '${rideData['date']} at ${rideData['time']}'),
                 _buildInfoRow(Icons.currency_rupee, '${bookingData['fare']}'),
+                if (bookingData['otp'] != null)
+                  _buildInfoRow(Icons.vpn_key, 'Ride OTP: ${bookingData['otp']}'),
                 FutureBuilder<String>(
                   future: _calculateRideDistance(rideData['from'] ?? '', rideData['to'] ?? ''),
                   builder: (context, snapshot) {
